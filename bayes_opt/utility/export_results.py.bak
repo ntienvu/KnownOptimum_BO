@@ -1,0 +1,673 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Mar 01 21:37:03 2016
+
+@author: Vu
+"""
+
+import sys
+sys.path.insert(0,'../..')
+sys.path.insert(0,'../')
+#from prada_bayes_opt import PradaBayOptFn
+
+#from sklearn.gaussian_process import GaussianProcess
+#from scipy.stats import norm
+#import matplotlib as plt
+from mpl_toolkits.mplot3d import Axes3D
+#from prada_bayes_opt.batchBO import bayesian_optimization_batch
+#from prada_bayes_opt import bayesian_optimization_function
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+#from bayes_opt import PradaBayesianOptimization
+import numpy as np
+import random
+import time
+import pickle
+import os
+import sys
+
+def print_result(bo,myfunction,Score,mybatch_type,acq_type,toolbox='GPyOpt'):
+
+    if 'BatchSz' in Score or mybatch_type=="lp":
+        print_result_batch(bo,myfunction,Score,mybatch_type,acq_type,toolbox)
+    else:
+        print_result_sequential(bo,myfunction,Score,mybatch_type,acq_type,toolbox)
+
+def print_result_sequential(bo,myfunction,Score,mybatch_type,acq_type,toolbox='GPyOpt'):
+    
+    if 'ystars' in acq_type:
+        acq_type['ystars']=[]
+    if 'xstars' in acq_type:
+        acq_type['xstars']=[]
+        
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+
+    #AveRegret=[np.mean(val) for idx,val in enumerate(Regret)]
+    #StdRegret=[np.std(val) for idx,val in enumerate(Regret)]
+    
+    if toolbox=='GPyOpt':
+        MaxFx=[val.min() for idx,val in enumerate(ybest)]
+    else:
+        MaxFx=[val.max() for idx,val in enumerate(ybest)]
+
+        
+    print '[{:s} {:s} {:s}] ElapseTime={:.3f}({:.2f})'\
+                .format(toolbox,mybatch_type,acq_type,np.mean(MyTime),np.std(MyTime))
+    
+    if toolbox=='GPyOpt':
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.2f})'.format(-1*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.2f})'.format(np.mean(MaxFx),np.std(MaxFx))
+    else:            
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+            
+    
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        if toolbox=='GPyOpt':
+            print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        else:
+            #SumOptTime=np.sum(MyOptTime,axis=1)
+            print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage"
+
+    if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+        strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}.pickle".format(myfunction.name,myfunction.input_dim,
+                                            mybatch_type,acq_type['name'],acq_type['k'])
+    else:
+        strFile="{:s}_{:d}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'])
+    
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f:
+        pickle.dump([ybest, MyTime,bo.bounds,MyOptTime], f)
+
+def print_result_mixed_categorical(bo,myfunction,Score,mybatch_type,acq_type):
+    
+
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+    
+    MaxFx=[val.max() for idx,val in enumerate(ybest)]
+        
+    print '[{:s} {:s}] ElapseTime={:.3f}({:.2f})'\
+                .format(mybatch_type,acq_type,np.mean(MyTime),np.std(MyTime))
+                
+    if myfunction.ismax==1:
+        print 'MaxBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))    
+    else:
+        print 'MinBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+            
+    
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+
+        #SumOptTime=np.sum(MyOptTime,axis=1)
+        print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage"
+
+   
+    strFile="{:s}_{:d}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'])
+    
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f:
+        pickle.dump([ybest, MyTime,bo.bounds], f)
+            
+def print_result_batch(bo,myfunction,Score,mybatch_type,acq_type,toolbox='GPyOpt'):
+    
+    if 'ystar_suggestions' in acq_type:
+        acq_type['ystar_suggestions']=[]
+    if 'xt_suggestions' in acq_type:
+        acq_type['xt_suggestions']=[]
+        
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+
+    #AveRegret=[np.mean(val) for idx,val in enumerate(Regret)]
+    #StdRegret=[np.std(val) for idx,val in enumerate(Regret)]
+    
+    if toolbox=='GPyOpt':
+        MaxFx=[val.min() for idx,val in enumerate(ybest)]
+    else:
+        MaxFx=[val.max() for idx,val in enumerate(ybest)]
+    
+        
+    print '[{:s} {:s} {:s}] ElapseTime={:.3f}({:.2f})'\
+                .format(toolbox,mybatch_type,acq_type,np.mean(MyTime),np.std(MyTime))
+    
+    if toolbox=='GPyOpt':
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.2f})'.format(-1*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.2f})'.format(np.mean(MaxFx),np.std(MaxFx))
+    else:            
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+            
+    BatchSz=Score["BatchSz"]
+    if toolbox=='GPyOpt':
+        print 'BatchSz={:.3f}({:.2f})'.format(np.mean(BatchSz),np.std(BatchSz))
+    else:
+        SumBatch=np.sum(BatchSz,axis=1)
+        print 'BatchSz={:.3f}({:.2f})'.format(np.mean(SumBatch),np.std(SumBatch))
+    
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        if toolbox=='GPyOpt':
+            print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        else:
+            #SumOptTime=np.sum(MyOptTime,axis=1)
+            print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage\\batch"
+    
+    
+        
+    if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+        strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}_B_{:d}.pickle".format(myfunction.name,myfunction.input_dim,
+                                            mybatch_type,acq_type['name'],acq_type['k'],int(BatchSz[0][1]))
+    else:
+        if mybatch_type=="lp":
+            B=Score["B"] # batch size per iteration
+            strFile="{:s}_{:d}_{:s}_{:s}_B_{:d}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'],int(B))
+        else:
+            strFile="{:s}_{:d}_{:s}_{:s}_B_{:d}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'],int(BatchSz[0][1]))
+    path=os.path.join(out_dir,strFile)
+
+    with open(path, 'w') as f:
+        pickle.dump([ybest, MyTime,BatchSz,bo.bounds,MyOptTime], f)
+    
+def print_result_consensus(myfunction,Score,mybatch_type,acq_type,xt_suggestions):
+    
+    # save the result for UCB EI ES and PES
+    xt_UCB=xt_suggestions['xt_UCB']
+    xt_EI=xt_suggestions['xt_EI']
+    xt_ES=xt_suggestions['xt_ES']
+    xt_PES=xt_suggestions['xt_PES']
+    
+    ybest_UCB=[myfunction.func(val) for idx,val in enumerate(xt_UCB)]
+    ybest_EI=[myfunction.func(val) for idx,val in enumerate(xt_EI)]
+    ybest_ES=[myfunction.func(val) for idx,val in enumerate(xt_ES)]
+    ybest_PES=[myfunction.func(val) for idx,val in enumerate(xt_PES)]
+    
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+ 
+    MaxFx=[val.max() for idx,val in enumerate(ybest)]
+    MaxFxUCB=[val.max() for idx,val in enumerate(ybest_UCB)]
+    MaxFxEI=[val.max() for idx,val in enumerate(ybest_EI)]
+    MaxFxES=[val.max() for idx,val in enumerate(ybest_ES)]
+    MaxFxPES=[val.max() for idx,val in enumerate(ybest_PES)] 
+        
+    print mybatch_type
+    print acq_type
+    #print MyTime
+    print 'ElapseTime={:.3f}({:.2f})'\
+                .format(np.mean(MyTime),np.std(MyTime))
+    
+    if myfunction.ismax==1:
+        print 'MaxBestConsensus={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+        print 'MaxBestUCB={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxUCB),np.std(MaxFxUCB)) 
+        print 'MaxBestEI={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxEI),np.std(MaxFxEI))    
+        print 'MaxBestES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxES),np.std(MaxFxES))    
+        print 'MaxBestPES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxPES),np.std(MaxFxPES))    
+    else:
+        print 'MinBestConsensus={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+        print 'MinBestUCB={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxUCB),np.std(MaxFxUCB)) 
+        print 'MinBestEI={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxEI),np.std(MaxFxEI))    
+        print 'MinBestES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxES),np.std(MaxFxES))    
+        print 'MinBestPES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxPES),np.std(MaxFxPES))          
+            
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        #SumOptTime=np.sum(MyOptTime,axis=1)
+        print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage_consensus"   
+    
+    if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+        strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}.pickle".format(myfunction.name,myfunction.input_dim,
+                                            mybatch_type,acq_type['name'],acq_type['k'])
+    else:
+        strFile="{:s}_{:d}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'])
+    
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f: # we store additional results of UCB, EI, ES and PES
+        pickle.dump([ybest, MyTime,MyOptTime,ybest_UCB,ybest_EI,ybest_ES,ybest_PES], f)
+        
+def print_result_variance_reduction_search(myfunction,Score,mybatch_type,acq_type,xt_suggestions):
+    
+    # save the result for UCB EI ES and PES
+    xt_UCB=xt_suggestions['xt_UCB']
+    xt_EI=xt_suggestions['xt_EI']
+    
+    ybest_UCB=[myfunction.func(val) for idx,val in enumerate(xt_UCB)]
+    ybest_EI=[myfunction.func(val) for idx,val in enumerate(xt_EI)]
+    
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+ 
+    MaxFx=[val.max() for idx,val in enumerate(ybest)]
+    MaxFxUCB=[val.max() for idx,val in enumerate(ybest_UCB)]
+    MaxFxEI=[val.max() for idx,val in enumerate(ybest_EI)]
+        
+    print mybatch_type
+    print acq_type
+    #print MyTime
+    print 'ElapseTime={:.3f}({:.2f})'\
+                .format(np.mean(MyTime),np.std(MyTime))
+    
+    
+    if 'xt_ES' in xt_suggestions:
+        xt_ES=xt_suggestions['xt_ES']
+        ybest_ES=[myfunction.func(val) for idx,val in enumerate(xt_ES)]
+        MaxFxES=[val.max() for idx,val in enumerate(ybest_ES)]
+
+
+    if 'xt_PES' in xt_suggestions:
+        xt_PES=xt_suggestions['xt_PES']
+        ybest_PES=[myfunction.func(val) for idx,val in enumerate(xt_PES)]
+        MaxFxPES=[val.max() for idx,val in enumerate(ybest_PES)]
+        
+    
+    if myfunction.ismax==1:
+        print 'MaxBestVRS={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+        print 'MaxBestUCB={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxUCB),np.std(MaxFxUCB)) 
+        print 'MaxBestEI={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxEI),np.std(MaxFxEI))   
+        if 'xt_ES' in xt_suggestions:
+            print 'MaxBestES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxES),np.std(MaxFxES))
+        if 'xt_PES' in xt_suggestions:
+            print 'MaxBestPES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxPES),np.std(MaxFxPES))    
+    else:
+        print 'MinBestVRS={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+        print 'MinBestUCB={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxUCB),np.std(MaxFxUCB)) 
+        print 'MinBestEI={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxEI),np.std(MaxFxEI))   
+        if 'xt_ES' in xt_suggestions:
+            print 'MinBestES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxES),np.std(MaxFxES))  
+        if 'xt_PES' in xt_suggestions:
+            print 'MinBestPES={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFxPES),np.std(MaxFxPES))          
+            
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        #SumOptTime=np.sum(MyOptTime,axis=1)
+        print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage_consensus"   
+    
+    if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+        strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}.pickle".format(myfunction.name,myfunction.input_dim,
+                                            mybatch_type,acq_type['name'],acq_type['k'])
+    else:
+        strFile="{:s}_{:d}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'])
+    
+    out=[ybest, MyTime,MyOptTime,ybest_UCB,ybest_EI]
+    if 'xt_ES' in xt_suggestions:
+        out.append(ybest_ES)
+    if 'xt_PES' in xt_suggestions:
+        out.append(ybest_PES)
+
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f: # we store additional results of UCB, EI, ES and PES
+        pickle.dump(out, f)
+    
+def print_result_vrs_of_ts(myfunction,Score,mybatch_type,acq_type):
+        
+    if 'ystars' in acq_type:
+        acq_type['ystars']=[]
+    if 'xstars' in acq_type:
+        acq_type['xstars']=[]
+        
+    #Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    #GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+ 
+    MaxFx=[val.max() for idx,val in enumerate(ybest)]
+
+    print mybatch_type
+    print acq_type
+    #print MyTime
+    print 'ElapseTime={:.3f}({:.2f})'\
+                .format(np.mean(MyTime),np.std(MyTime))
+    
+    if myfunction.ismax==1:
+        print 'MaxBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+
+    else:
+        print 'MinBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+       
+            
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        #SumOptTime=np.sum(MyOptTime,axis=1)
+        print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage_consensus"   
+    
+
+    strFile="{:s}_{:d}_{:s}_{:s}_M_{:d}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'],acq_type['n_xstars'])
+    
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f: # we store additional results of UCB, EI, ES and PES
+        pickle.dump([ybest, MyTime,MyOptTime], f)
+
+"""		
+def print_result_GPy(bo,myfunction,Score,mybatch_type,acq_type):
+    #GPyOpt
+    Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+
+    AveRegret=[np.mean(val) for idx,val in enumerate(Regret)]
+    StdRegret=[np.std(val) for idx,val in enumerate(Regret)]
+    
+    MaxFx=[val.min() for idx,val in enumerate(ybest)]
+        
+    print '[{:s} {:s}] GAP={:.3f}({:.2f}) AvgRegret={:.3f}({:.2f}) ElapseTime={:.3f}({:.2f})'\
+                .format(mybatch_type,acq_type,np.mean(GAP),np.std(GAP),np.mean(AveRegret),\
+                np.std(StdRegret),np.mean(MyTime),np.std(MyTime))
+    
+    if myfunction.ismax==1:
+        print 'MaxBest={:.4f}({:.2f})'.format(-1*np.mean(MaxFx),np.std(MaxFx))    
+    else:
+        print 'MinBest={:.4f}({:.2f})'.format(np.mean(MaxFx),np.std(MaxFx))
+
+            
+    if 'BatchSz' in Score:
+        BatchSz=Score["BatchSz"]
+        B=Score["B"] # batch size per iteration
+        print 'BatchSz={:.3f}({:.2f})'.format(np.mean(BatchSz),np.std(BatchSz))
+    
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        print 'OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage"
+        
+    if 'BatchSz' in Score:
+        if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+            strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}_B_{:d}.pickle".format(myfunction.name,myfunction.input_dim,
+                                                mybatch_type,acq_type['name'],acq_type['k'],int(BatchSz[0][1]))
+        else:
+            strFile="{:s}_{:d}_{:s}_{:s}_B_{:d}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'],int(B))
+        path=os.path.join(out_dir,strFile)
+
+        with open(path, 'w') as f:
+            pickle.dump([ybest, Regret, MyTime,BatchSz,bo.bounds], f)
+    else:
+        if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+            strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}.pickle".format(myfunction.name,myfunction.input_dim,
+                                                mybatch_type,acq_type['name'],acq_type['k'])
+        else:
+            strFile="{:s}_{:d}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'])
+        
+        path=os.path.join(out_dir,strFile)
+        with open(path, 'w') as f:
+            pickle.dump([ybest, Regret, MyTime,bo.bounds], f)
+"""	
+            
+def print_result_unbounded(bo,myfunction,Score,mybatch_type,acq_type,alg_type,toolbox='GPyOpt'):
+    Regret=Score["Regret"]
+    ybest=Score["ybest"]
+    GAP=Score["GAP"]
+    MyTime=Score["MyTime"]
+    
+    print '{:s} {:d}'.format(myfunction.name,myfunction.input_dim)
+
+    AveRegret=[np.mean(val) for idx,val in enumerate(Regret)]
+    StdRegret=[np.std(val) for idx,val in enumerate(Regret)]
+    
+    if toolbox=='GPyOpt':
+        MaxFx=[val.min() for idx,val in enumerate(ybest)]
+    else:
+        MaxFx=[val.max() for idx,val in enumerate(ybest)]
+        
+    print '[{:s} {:s} {:s} {:s}] GAP={:.3f}({:.2f}) AvgRegret={:.3f}({:.2f}) ElapseTime={:.3f}({:.2f})'\
+                .format(toolbox,mybatch_type,acq_type,alg_type,np.mean(GAP),np.std(GAP),np.mean(AveRegret),\
+                np.std(StdRegret),np.mean(MyTime),np.std(MyTime))
+    
+    if toolbox=='GPyOpt':
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.2f})'.format(-1*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.2f})'.format(np.mean(MaxFx),np.std(MaxFx))
+    else:            
+        if myfunction.ismax==1:
+            print 'MaxBest={:.4f}({:.3f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))    
+        else:
+            print 'MinBest={:.4f}({:.3f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx))
+            
+    if 'BatchSz' in Score:
+        BatchSz=Score["BatchSz"]
+        if toolbox=='GPyOpt':
+            print 'BatchSz={:.3f}({:.2f})'.format(np.mean(BatchSz),np.std(BatchSz))
+        else:
+            SumBatch=np.sum(BatchSz,axis=1)
+            print 'BatchSz={:.3f}({:.2f})'.format(np.mean(SumBatch),np.std(SumBatch))
+    
+    if 'MyOptTime' in Score:
+        MyOptTime=Score["MyOptTime"]
+        if toolbox=='GPyOpt':
+            print 'OptTime={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime))
+        else:
+            SumOptTime=np.sum(MyOptTime,axis=1)
+            print 'OptTime={:.1f}({:.1f})'.format(np.mean(SumOptTime),np.std(SumOptTime))
+    
+    print    "lower bound",
+    print bo.bounds[:,0]
+    print "upper bound",
+    print bo.bounds[:,1]
+    
+    print    "init lower bound",
+    print bo.b_init_lower
+    print "init upper bound",
+    print bo.b_init_upper
+
+    print    "limit lower bound",
+    print bo.b_limit_lower
+    print "limit upper bound",
+    print bo.b_limit_upper
+    
+    out_dir="P:\\03.Research\\05.BayesianOptimization\\PradaBayesianOptimization\\pickle_storage"
+    
+    if acq_type['name']=='lei': # if ELI acquisition function, we have extra variable 'k'
+        strFile="{:s}_{:d}_{:s}_{:s}_c_{:f}.pickle".format(myfunction.name,myfunction.input_dim,
+                                                    mybatch_type,acq_type['name'],acq_type['k'],alg_type)
+    else:
+        strFile="{:s}_{:d}_{:s}_{:s}_{:s}.pickle".format(myfunction.name,myfunction.input_dim,mybatch_type,acq_type['name'],alg_type)
+        
+    path=os.path.join(out_dir,strFile)
+    with open(path, 'w') as f:
+        if 'BatchSz' in Score:
+            pickle.dump([ybest, Regret, MyTime,BatchSz,bo.bounds,bo.b_init_lower,bo.b_init_upper
+            ,bo.b_limit_lower,bo.b_limit_upper], f)
+        else:
+            pickle.dump([ybest, Regret, MyTime,bo.bounds,bo.b_init_lower,bo.b_init_upper
+            ,bo.b_limit_lower,bo.b_limit_upper], f)
+            
+def yBest_Iteration(YY,BatchSzArray,IsPradaBO=0,Y_optimal=0,step=3):
+    
+    nRepeat=len(YY)
+    YY=np.asarray(YY)
+    ##YY_mean=np.mean(YY,axis=0)
+    #YY_std=np.std(YY,axis=0)
+    
+    mean_TT=[]
+    #temp_std=np.std(YY[:,0:BatchSzArray[0]+1])
+    #temp_std=np.std(YY_mean[0:BatchSzArray[0]+1])
+    
+    mean_cum_TT=[]
+    
+    for idxtt,tt in enumerate(range(0,nRepeat)): # TT run
+    
+        if IsPradaBO==1:
+            temp_mean=YY[idxtt,0:BatchSzArray[0]+1].max()
+        else:
+            temp_mean=YY[idxtt,0:BatchSzArray[0]+1].min()
+        
+        temp_mean_cum=YY[idxtt,0:BatchSzArray[0]+1].mean()
+
+        start_point=0
+        for idx,bz in enumerate(BatchSzArray): # batch
+            if idx==len(BatchSzArray)-1:
+                break
+            bz=np.int(bz)
+
+            #    get the average in this batch
+            temp_mean_cum=np.vstack((temp_mean_cum,YY[idxtt,start_point:start_point+bz].mean()))
+            
+            # find maximum in each batch            
+            if IsPradaBO==1:
+                temp_mean=np.vstack((temp_mean,YY[idxtt,start_point:start_point+bz].max()))
+            else:
+                temp_mean=np.vstack((temp_mean,YY[idxtt,start_point:start_point+bz].min()))
+
+            start_point=start_point+bz
+
+        if IsPradaBO==1:
+            myYbest=[temp_mean[:idx+1].max()*-1 for idx,val in enumerate(temp_mean)]
+            temp_mean_cum=temp_mean_cum*-1
+            temp_mean=temp_mean*-1
+        else:
+            myYbest=[temp_mean[:idx+1].min() for idx,val in enumerate(temp_mean)]
+        
+        # cumulative regret for each independent run
+        #myYbest_cum=[np.mean(np.abs(temp_mean_cum[:idx+1]-Y_optimal)) for idx,val in enumerate(temp_mean_cum)]
+        
+        temp_regret=np.abs(temp_mean-Y_optimal)
+        myYbest_cum=[np.mean(temp_regret[:idx+1]) for idx,val in enumerate(temp_regret)]
+
+
+        if len(mean_TT)==0:
+            mean_TT=myYbest
+            mean_cum_TT=myYbest_cum
+        else:
+            #mean_TT.append(temp_mean)
+            mean_TT=np.vstack((mean_TT,myYbest))
+            mean_cum_TT=np.vstack((mean_cum_TT,myYbest_cum))
+            
+    mean_TT    =np.array(mean_TT)
+    std_TT=np.std(mean_TT,axis=0)
+    std_TT=np.array(std_TT).ravel()
+    mean_TT=np.mean(mean_TT,axis=0)
+
+    
+    mean_cum_TT=np.array(mean_cum_TT)   
+    std_cum_TT=np.std(mean_cum_TT,axis=0)
+    std_cum_TT=np.array(std_cum_TT).ravel()
+    mean_cum_TT=np.mean(mean_cum_TT,axis=0)
+   
+    #return mean_TT[::step],std_TT[::step]#,mean_cum_TT[::5],std_cum_TT[::5]
+    return mean_TT[::step],std_TT[::step],mean_cum_TT[::step],std_cum_TT[::step]
+
+
+def compute_average_cumulative_simple_regret(YY,BatchSzArray,IsPradaBO=0,Y_optimal=0):
+        
+    nRepeat=len(YY)
+    YY=np.asarray(YY)
+    
+    #half_list_index=np.int(len(YY[0])*0.5)
+    half_list_index=BatchSzArray[0]+1
+    #half_list_index=1
+
+    # remove first half
+   # mean_TT=[]
+   
+       
+
+
+    mean_cum_simple_regret_TT=[]
+    
+    for idxtt,tt in enumerate(range(0,nRepeat)): # TT run
+    
+        if IsPradaBO==1:
+            temp_simple_regret=YY[idxtt,0:BatchSzArray[0]+1].max()
+        else:
+            temp_simple_regret=YY[idxtt,0:BatchSzArray[0]+1].min()
+        
+
+        start_point=0
+        for idx,bz in enumerate(BatchSzArray): # batch
+            if idx==0:
+                continue
+            if idx==len(BatchSzArray)-1:
+                break
+            bz=np.int(bz)
+            
+            # find maximum in each batch            
+            if IsPradaBO==1:
+                temp_simple_regret=np.vstack((temp_simple_regret,YY[idxtt,start_point:start_point+bz].max()))
+            else:
+                temp_simple_regret=np.vstack((temp_simple_regret,YY[idxtt,start_point:start_point+bz].min()))
+
+            start_point=start_point+bz
+
+        if IsPradaBO==1:
+            # ignore the first element of initialization
+            myYbest=[temp_simple_regret[:idx+1].max()*-1 for idx,val in enumerate(temp_simple_regret)]
+            temp_simple_regret=temp_simple_regret*-1
+        else:
+            myYbest=[temp_simple_regret[:idx+1].min() for idx,val in enumerate(temp_simple_regret)]
+        
+        # cumulative regret for each independent run
+        #myYbest_cum=[np.mean(np.abs(temp_mean_cum[:idx+1]-Y_optimal)) for idx,val in enumerate(temp_mean_cum)]
+        
+        temp_regret=np.abs(np.asarray(myYbest)-Y_optimal)
+        temp_regret=temp_regret[half_list_index:]
+        myYbest_cum=[np.mean(temp_regret[:idx+1]) for idx,val in enumerate(temp_regret)]
+
+        
+        
+        if len(mean_cum_simple_regret_TT)==0:
+            #mean_TT=myYbest
+            mean_cum_simple_regret_TT=myYbest_cum
+        else:
+            #mean_TT.append(temp_mean)
+            #mean_TT=np.vstack((mean_TT,myYbest))
+            mean_cum_simple_regret_TT=np.vstack((mean_cum_simple_regret_TT,myYbest_cum))
+            
+    
+    mean_cum_simple_regret_TT=np.array(mean_cum_simple_regret_TT)   
+    std_cum_TT=np.std(mean_cum_simple_regret_TT,axis=0)
+    std_cum_TT=np.array(std_cum_TT).ravel()
+    mean_cum_simple_regret_TT=np.mean(mean_cum_simple_regret_TT,axis=0)
+   
+    #return mean_TT[::step],std_TT[::step]#,mean_cum_TT[::5],std_cum_TT[::5]
+    #return mean_TT,std_TT,np.mean(mean_cum_simple_regret_TT),np.mea(std_cum_TT)
+    
+    #half_list_index=np.int(len(mean_cum_simple_regret_TT)*0.5)
+    #return np.mean(mean_cum_simple_regret_TT[half_list_index:]),np.mean(std_cum_TT[half_list_index:])
+    return np.mean(mean_cum_simple_regret_TT),np.mean(std_cum_TT)
