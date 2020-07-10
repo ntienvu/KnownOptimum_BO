@@ -4,7 +4,6 @@ Release code for ICML2020 Knowing The What But Not The Where in Bayesian Optimiz
 Copy right by the authors.
 
 
-# Scripts:
 # Visualization
 demo_visualization_knowing_the_what.....ipynb
 
