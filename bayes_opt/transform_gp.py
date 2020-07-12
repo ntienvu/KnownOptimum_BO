@@ -1,85 +1,70 @@
 
 # define Gaussian Process class
 
-
 import numpy as np
 from scipy.optimize import minimize
-from bayes_opt.acquisition_functions import unique_rows
-
+#from bayes_opt.acquisition_functions import unique_rows
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import euclidean_distances
-from scipy.spatial.distance import pdist
-from scipy.spatial.distance import cdist
-import scipy.linalg as spla
-
-
-from scipy.spatial.distance import squareform
+#import scipy.linalg as spla
+from bayes_opt.utilities import unique_rows
+import scipy
 
 class TransformedGP(object):
     # transform GP given known optimum value: f = f^* - 1/2 g^2
-    def __init__ (self,param):
+    def __init__ (self,SearchSpace,fstar=None,noise_delta=1e-8,verbose=0,IsZeroMean=False):
         # init the model
     
-        # theta for RBF kernel exp( -theta* ||x-y||)
-        if 'kernel' not in param:
-            param['kernel']='SE'
-            
-        kernel_name=param['kernel']
-        if kernel_name not in ['SE','ARD']:
-            err = "The kernel function " \
-                  "{} has not been implemented, " \
-                  "please choose one of the kernel SE ARD.".format(kernel_name)
-            raise NotImplementedError(err)
-        else:
-            self.kernel_name = kernel_name
-            
-            
-        if 'lengthscale' not in param:
-            self.lengthscale=param['theta']
-        else:
-            self.lengthscale=param['lengthscale']
-            self.theta=self.lengthscale
+        self.noise_delta=noise_delta
+        self.noise_upperbound=noise_delta
+        self.mycov=self.cov_RBF
+        self.SearchSpace=SearchSpace
+        scaler = MinMaxScaler()
+        scaler.fit(SearchSpace.T)
+        self.Xscaler=scaler
+        self.verbose=verbose
+        self.dim=SearchSpace.shape[0]
+        
+        self.hyper={}
+        self.hyper['var']=1 # standardise the data
+        self.hyper['lengthscale']=0.035 #to be optimised
+        #self.hyper['noise_delta']=noise_delta # could be optimised
+        self.noise_delta=self.noise_delta
+        self.fstar=fstar
+        self.IsZeroMean=IsZeroMean
 
-        if 'lengthscale_vector' not in param: # for marginalize hyperparameters
-            self.lengthscale_vector=[]
-        else:
-            self.lengthscale_vector=param['lengthscale_vector']
         
-        if 'isZeroMean' not in param:
-            self.isZeroMean=False
-        else:
-            self.isZeroMean=param['isZeroMean']
+#        self.KK_x_x=[]
+#        self.KK_x_x_inv=[]
+#    
+#        self.fstar=0
+#        self.X=[]
+#        self.Y=[]
+#        self.G=[]
+#        self.lengthscale_old=self.lengthscale
+#        self.flagOptimizeHyperFirst=0
+#        
+#        self.alpha=[] # for Cholesky update
+#        self.L=[] # for Cholesky update LL'=A
+#    def set_optimum_value(self,fstar_scaled):
+#        self.fstar_scaled=fstar_scaled
+
+    def cov_RBF(self,x1, x2,hyper):        
+        """
+        Radial Basic function kernel (or SE kernel)
+        """
+        variance=hyper['var']
+        lengthscale=hyper['lengthscale']
         
+        if x1.shape[1]!=x2.shape[1]:
+            x1=np.reshape(x1,(-1,x2.shape[1]))
+        Euc_dist=euclidean_distances(x1,x2)
         
-        #self.theta=param['theta']
+        return variance*np.exp(-np.square(Euc_dist)/lengthscale)
         
-        self.gp_params=param
-        # noise delta is for GP version with noise
-        self.noise_delta=param['noise_delta']
-        
-        self.KK_x_x=[]
-        self.KK_x_x_inv=[]
     
-        self.fstar=0
-        self.X=[]
-        self.Y=[]
-        self.G=[]
-        self.lengthscale_old=self.lengthscale
-        self.flagOptimizeHyperFirst=0
         
-        self.alpha=[] # for Cholesky update
-        self.L=[] # for Cholesky update LL'=A
-
-    def kernel_dist(self, a,b,lengthscale):
-        
-        if self.kernel_name == 'ARD':
-            return self.ARD_dist_func(a,b,lengthscale)
-        if self.kernel_name=='SE':
-            Euc_dist=euclidean_distances(a,b)
-            return np.exp(-np.square(Euc_dist)/lengthscale)
-        
-
-        
-    def fit(self,X,Y,fstar):
+    def fit(self,X,Y,fstar=None,IsOptimize=0):
         """
         Fit Gaussian Process model
 
@@ -95,13 +80,19 @@ class TransformedGP(object):
         
         self.X=X
         self.Y=Y
-        self.fstar=fstar
+        if fstar is not None:
+            self.fstar=fstar
         self.G=np.sqrt(2.0*(fstar-Y))
         #self.G=np.log(1.0*(fstar-Y))
         
         # print("only SE kernel is implemented!")
-        Euc_dist=euclidean_distances(X,X)
-        self.KK_x_x=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(len(X))*self.noise_delta
+        #Euc_dist=euclidean_distances(X,X)
+        
+        if IsOptimize:
+            self.hyper['lengthscale']=self.optimise()         # optimise GP hyperparameters
+        #self.hyper['epsilon'],self.hyper['lengthscale'],self.noise_delta=self.optimise()         # optimise GP hyperparameters
+        self.KK_x_x=self.mycov(self.X,self.X,self.hyper)+np.eye(len(X))*self.noise_delta 
+        #self.KK_x_x=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(len(X))*self.noise_delta
         
         if np.isnan(self.KK_x_x).any(): #NaN
             print("nan in KK_x_x")
@@ -112,7 +103,7 @@ class TransformedGP(object):
         # no zero mean
         
         # zero mean
-        if self.isZeroMean:
+        if self.IsZeroMean:
             tempG=np.linalg.solve(self.L,self.G)
         else:
             tempG=np.linalg.solve(self.L,self.G-np.sqrt(2*self.fstar))
@@ -120,140 +111,69 @@ class TransformedGP(object):
         #self.alpha=np.linalg.solve(self.L.T,temp)
         self.alphaG=np.linalg.solve(self.L.T,tempG)
         
-
-    
-    def log_marginal_lengthscale(self,lengthscale,noise_delta):
-        """
-        Compute Log Marginal likelihood of the GP model w.r.t. the provided lengthscale
-        # using SE kernel in this implementation
-        # could be flexible for other kernel choices
-        """
-
-        def compute_log_marginal(X,lengthscale,noise_delta):
-            # compute K
-            ur = unique_rows(self.X)
-            myX=self.X[ur]
-            #myY=np.sqrt(0.5*(self.fstar-self.Y[ur]))
-            myY=self.Y[ur]
-            
-            if self.flagOptimizeHyperFirst==0:
-                self.Euc_dist_X_X=euclidean_distances(myX,myX)
-                KK=np.exp(-np.square(self.Euc_dist_X_X)/lengthscale)+np.eye(len(myX))*self.noise_delta
-                
-                self.flagOptimizeHyperFirst=1
-            else:
-                KK=np.exp(-np.square(self.Euc_dist_X_X)/lengthscale)+np.eye(len(myX))*self.noise_delta
-               
-            try:
-                temp_inv=np.linalg.solve(KK,myY)
-            except: # singular
-                return -np.inf
-            
-            try:
-                first_term=-0.5*np.dot(myY.T,temp_inv)
-                
-                # if the matrix is too large, we randomly select a part of the data for fast computation
-                if KK.shape[0]>200:
-                    idx=np.random.permutation(KK.shape[0])
-                    idx=idx[:200]
-                    KK=KK[np.ix_(idx,idx)]
-                #Wi, LW, LWi, W_logdet = pdinv(KK)
-                #sign,W_logdet2=np.linalg.slogdet(KK)
-                chol  = spla.cholesky(KK, lower=True)
-                W_logdet=np.sum(np.log(np.diag(chol)))
-                # Uses the identity that log det A = log prod diag chol A = sum log diag chol A
-    
-                #second_term=-0.5*W_logdet2
-                second_term=-W_logdet
-            except: # singular
-                return -np.inf
-            
-            #print "first term ={:.4f} second term ={:.4f}".format(np.asscalar(first_term),np.asscalar(second_term))
-
-            logmarginal=first_term+second_term-0.5*len(myY)*np.log(2*3.14)
-                
-            if np.isnan(np.asscalar(logmarginal))==True:
-                print("theta={:s} first term ={:.4f} second  term ={:.4f}".format(lengthscale,np.asscalar(first_term),np.asscalar(second_term)))
-                #print temp_det
-
-            return np.asscalar(logmarginal)
+    def log_llk(self,X,y,hyper_values):
         
-        #print lengthscale
-        logmarginal=0
-        
-        if np.isscalar(lengthscale):
-            logmarginal=compute_log_marginal(self.X,lengthscale,noise_delta)
-            return logmarginal
+        #print(hyper_values)
+        hyper={}
+        hyper['var']=1
+        hyper['lengthscale']=hyper_values[0]
+        noise_delta=self.noise_delta
 
-        if not isinstance(lengthscale,list) and len(lengthscale.shape)==2:
-            logmarginal=[0]*lengthscale.shape[0]
-            for idx in range(lengthscale.shape[0]):
-                logmarginal[idx]=compute_log_marginal(self.X,lengthscale[idx],noise_delta)
-        else:
-            logmarginal=compute_log_marginal(self.X,lengthscale,noise_delta)
-                
-        return logmarginal
-    
- 
-    
-    def optimize_lengthscale_SE_maximizing(self,previous_theta,noise_delta):
-        """
-        Optimize to select the optimal lengthscale parameter
-        """
+        KK_x_x=self.mycov(X,X,hyper)+np.eye(len(X))*noise_delta     
+        if np.isnan(KK_x_x).any(): #NaN
+            print("nan in KK_x_x !")   
+
+        try:
+            L=scipy.linalg.cholesky(KK_x_x,lower=True)
+            alpha=np.linalg.solve(KK_x_x,y)
+
+        except: # singular
+            return -np.inf
+        try:
+            first_term=-0.5*np.dot(self.Y.T,alpha)
+            W_logdet=np.sum(np.log(np.diag(L)))
+            second_term=-W_logdet
+
+        except: # singular
+            return -np.inf
+
+        logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
-        #print("maximizing lengthscale")
-        dim=self.X.shape[1]
+        #print(hyper_values,logmarginal)
+        return np.asscalar(logmarginal)
+   
         
-        # define a bound on the lengthscale
-        bounds_lengthscale_min=0.00005
-        bounds_lengthscale_max=0.5*dim
-        mybounds=[np.asarray([bounds_lengthscale_min,bounds_lengthscale_max]).T]
+    def set_ls(self,lengthscale):
+        self.hyper['lengthscale']=lengthscale
+        
+    def optimise(self):
        
-        
-        lengthscale_tries = np.random.uniform(bounds_lengthscale_min, bounds_lengthscale_max,size=(10*dim, 1))        
-        lengthscale_tries=np.vstack((lengthscale_tries,previous_theta,bounds_lengthscale_min))
-        
-        # evaluate
-        self.flagOptimizeHyperFirst=0 # for efficiency
+        """
+        Optimise the GP kernel hyperparameters
+        Returns
+        x_t
+        """
+        opts ={'maxiter':200,'maxfun':200,'disp': False}
 
-        logmarginal_tries=self.log_marginal_lengthscale(lengthscale_tries,noise_delta)
-        #print logmarginal_tries
+        # epsilon, ls, var, noise var
+        #bounds=np.asarray([[9e-3,0.007],[1e-2,self.noise_upperbound]])
+        bounds=np.asarray([[1e-2,1]])
 
-        #find x optimal for init
-        idx_max=np.argmax(logmarginal_tries)
-        lengthscale_init_max=lengthscale_tries[idx_max]
-        #print lengthscale_init_max
-        
-        myopts ={'maxiter':10,'maxfun':10}
-
-        x_max=[]
-        max_log_marginal=None
-        
-        for i in range(1):
-            res = minimize(lambda x: -self.log_marginal_lengthscale(x,noise_delta),lengthscale_init_max,
-                           bounds=mybounds,method="L-BFGS-B",options=myopts)#L-BFGS-B
-            if 'x' not in res:
-                val=self.log_marginal_lengthscale(res,noise_delta)    
-            else:
-                val=self.log_marginal_lengthscale(res.x,noise_delta)  
+        init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
+        logllk=[0]*init_theta.shape[0]
+        for ii,val in enumerate(init_theta): 
+            logllk[ii]=self.log_llk(self.X,self.Y,hyper_values=val) #noise_delta=self.noise_delta
             
-            # Store it if better than previous minimum(maximum).
-            if max_log_marginal is None or val >= max_log_marginal:
-                if 'x' not in res:
-                    x_max = res
-                else:
-                    x_max = res.x
-                max_log_marginal = val
-            #print res.x
-        return x_max
-    
+        x0=init_theta[np.argmax(logllk)]
 
-    def optimize_lengthscale(self,previous_theta,noise_delta):
-       
-        if self.kernel_name=='SE':
-            return self.optimize_lengthscale_SE_maximizing(previous_theta,noise_delta)
-        else:
-            print("only SE kernel is implemented!")
+        res = minimize(lambda x: -self.log_llk(self.X,self.Y,hyper_values=x),x0,
+                                   bounds=bounds,method="L-BFGS-B",options=opts)#L-BFGS-B
+        
+        if self.verbose:
+            print("estimated lengthscale",res.x)
+            
+        return res.x  
+
 
   
     def predict_g2(self,xTest,eval_MSE=True):
@@ -297,7 +217,7 @@ class TransformedGP(object):
 
         return mf.ravel(),np.diag(varf)     
     
-    def predict(self,xTest,eval_MSE=True):
+    def predict(self,Xtest,isOriScale=False):
         """
         compute predictive mean and variance
         Input Parameters
@@ -308,26 +228,22 @@ class TransformedGP(object):
         -------
         mean, var
         """    
-        if len(xTest.shape)==1: # 1d
-            xTest=xTest.reshape((-1,self.X.shape[1]))
-        
-        # prevent singular matrix
-        ur = unique_rows(self.X)
-        X=self.X[ur]
-        #Y=self.Y[ur]
-        #Gtest=np.log(1.0*(self.fstar-))
-
-        # print("only SE kernel is implemented")
+        if isOriScale:
+            Xtest=self.Xscaler.transform(Xtest)
             
-        Euc_dist=euclidean_distances(xTest,xTest)
-        KK_xTest_xTest=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(xTest.shape[0])*self.noise_delta
+        if len(Xtest.shape)==1: # 1d
+            Xtest=np.reshape(Xtest,(-1,self.X.shape[1]))
+            
+        if Xtest.shape[1] != self.X.shape[1]: # different dimension
+            Xtest=np.reshape(Xtest,(-1,self.X.shape[1]))
+            
+        KK_xTest_xTest=self.mycov(Xtest,Xtest,self.hyper)+np.eye(Xtest.shape[0])*self.noise_delta
+        KK_xTest_xTrain=self.mycov(Xtest,self.X,self.hyper)
         
-        Euc_dist_test_train=euclidean_distances(xTest,X)
-        KK_xTest_xTrain=np.exp(-np.square(Euc_dist_test_train)/self.lengthscale)
-        
+       
         # using Cholesky update
         
-        if self.isZeroMean:
+        if self.IsZeroMean:
             meanG=np.dot(KK_xTest_xTrain,self.alphaG) # zero prior mean
         else:
             meanG=np.dot(KK_xTest_xTrain,self.alphaG)+np.sqrt(2*self.fstar) # non zero prior mean
@@ -345,7 +261,7 @@ class TransformedGP(object):
         # using moment matching
         
     
-        return mf.ravel(),np.diag(varf)  
+        return np.reshape(mf.ravel(),(-1,1)),np.reshape(np.diag(varf)  ,(-1,1))
 
     def predict_G(self,xTest,eval_MSE=True):
         """
