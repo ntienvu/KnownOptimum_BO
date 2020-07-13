@@ -28,9 +28,9 @@ After running these scripts to reproduce experiments, the results will be stored
 Then, we can plot all the results using scripts in the "plot" folder.
 
 # Dependencies
-* Numpy
-* Scipy
-* Scikit-learn
+* numpy
+* scipy
+* matplotlib
 
 
 # Reference
