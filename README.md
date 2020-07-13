@@ -35,5 +35,5 @@ Then, we can plot all the results using scripts in the "plot" folder.
 
 # Reference
 ```
-Vu Nguyen and Osborne A. Michael "Knowing the what but not the where in Bayesian optimization." International Conference on Machine Learning (ICML), 2020.
+Vu Nguyen and Michael A. Osborne.  "Knowing the what but not the where in Bayesian optimization." International Conference on Machine Learning (ICML), 2020.
 ```
