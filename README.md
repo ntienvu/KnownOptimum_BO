@@ -32,6 +32,9 @@ Then, we can plot all the results using scripts in the "plot" folder.
 * scipy
 * matplotlib
 
+# Paper and Presentation
+Visit https://proceedings.icml.cc/static/paper_files/icml/2020/2351-Paper.pdf
+
 
 # Reference
 ```
