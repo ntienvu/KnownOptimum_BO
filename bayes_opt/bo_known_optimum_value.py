@@ -200,14 +200,8 @@ class BayesOpt_KnownOptimumValue(object):
 
         np.random.seed(seed)
         # Generate random points
-        l = [np.random.uniform(x[0], x[1]) for _ in range(n_init_points) for x in self.SearchSpace]
-
-        # Concatenate new random points to possible existing
-        # points from self.explore method.
-        temp=np.asarray(l)
-        temp=temp.T
-        init_X=list(temp.reshape((n_init_points,-1)))
-        
+        init_X = np.random.uniform(self.SearchSpace[:, 0], self.SearchSpace[:, 1],size=(n_init_points, self.dim))
+   
         self.X_ori = np.asarray(init_X)
         
         # Evaluate target function at all initialization           
