@@ -5,7 +5,7 @@ import numpy as np
 from collections import OrderedDict
 from scipy.stats import multivariate_normal
 from matplotlib import pyplot as plt
-#from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D
 
 def reshape(x,input_dim):
     '''
@@ -35,20 +35,20 @@ class functions:
         X2=np.array([X[:,1]])
         X1, X2 = np.meshgrid(X1, X2)
         y=np.zeros([X1.shape[1],X2.shape[1]])
-		#print(y.shape)
-		#print(X1.shape)
-		#print(X2.shape)
+        #print(y.shape)
+        #print(X1.shape)
+        #print(X2.shape)
         for ii in range(0,X1.shape[1]):
             for jj in range(0,X2.shape[1]):
                 Xij=np.array([X1[ii,ii],X2[jj,jj]])
                 #print(Xij)
                 y[ii,jj]=self.func(Xij)
-                #		f1=plt.figure(1)
-                #		ax=plt.axes(projection='3d')
-                #		ax.plot_surface(X1,X2,y)
+                #        f1=plt.figure(1)
+                #        ax=plt.axes(projection='3d')
+                #        ax.plot_surface(X1,X2,y)
                 plt.contourf(X1,X2,y,levels=np.arange(0,35,1))
                 plt.colorbar()
-		
+        
     
     def findSdev(self):
         num_points_per_dim=100
@@ -69,7 +69,7 @@ class functions:
         #maxima=np.max(y)
         #minima=np.min(y)
         return sdv
-
+    
 class saddlepoint(functions):
     def __init__(self):
         self.input_dim=2
@@ -86,7 +86,7 @@ class saddlepoint(functions):
         return fval*self.ismax
         
 class sin(functions):
-    def __init__(self):
+    def __init__(self,sd=None):
         self.input_dim=1
         self.bounds={'x':(-1,15)}
         #self.bounds={'x':(0,1)}
@@ -94,7 +94,12 @@ class sin(functions):
         self.fstar=11
         self.min=0
         self.ismax=1
-        self.name='sincos'
+        self.name='sin'
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
     def func(self,x):
         x=np.asarray(x)
 
@@ -102,7 +107,7 @@ class sin(functions):
         return fval*self.ismax
         
 class sincos(functions):
-    def __init__(self):
+    def __init__(self,sd=None):
         self.input_dim=1
         self.bounds={'x':(-1,2)}
         #self.bounds={'x':(0,1)}
@@ -111,81 +116,51 @@ class sincos(functions):
         self.min=0
         self.ismax=1
         self.name='sincos'
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
     def func(self,x):
         x=np.asarray(x)
 
         fval=x*np.sin(x)+x*np.cos(2*x)
         return fval*self.ismax
-    
-    
-class mixtureGaussian(functions):
-    """
-    Description: The two peak Gaussian mixture function described in the paper. 
-    Used for BO method evaluation.
-    Useage: must be initiated with a f=doubleGaussian() call. It can then be
-    evaluated with f.func(x) for the input x. Optionally a dimension parameter,
-    d, can be added to the call, f=doubleGaussian(dim=d).
-    Output: fval, the function value at x
-    """
-    def __init__(self,bounds=None, dim=2):
-        self.input_dim=dim
-        self.sd=0
-        if bounds == None:
-            self.bounds =[(0,1)]*self.input_dim
-        else:
-            self.bounds = bounds
-        self.min = [(0.)*self.input_dim]
-        self.fmin=-1
-        self.ismax=-1
-        self.name="mixtureGaussian"
-        self.sd=self.findSdev()
-        self.fstar=3.99
-        #self.functionMin,self.functionMax=(0,0)
-        #self.functionMin,self.functionMax=self.findExtrema()
-    def func(self,X):
-        X = reshape(X,self.input_dim)
-        n = X.shape[0]
-        y1=multivariate_normal.pdf(X,mean=0.7*np.ones(self.input_dim),cov=0.01*np.eye(self.input_dim))
-        y2=multivariate_normal.pdf(X,mean=0.2*np.ones(self.input_dim),cov=0.01*np.eye(self.input_dim))
-        fval=y1+y2
-        ###############################################################################        
-        ##Generates noise. Comment out between the hash lines to run in the
-        ##noiseless case
-        #noise = np.random.normal(0,0.1*self.sd,1).reshape(1,1)
-        #fval=fval+np.ravel(noise)
-        ############################################################################### 
-        return fval
-    
-class fourier(functions):
-	'''
-	Forrester function. 
-	
-	:param sd: standard deviation, to generate noisy evaluations of the function.
-	'''
-	def __init__(self,sd=None):
-		if sd==None or sd==0:
-			self.sd=0
-		else:
-			self.sd=self.findSdev()
-		self.input_dim = 1
-		self.ismax=-1
-		
 
-		self.min = 4.795 		## approx
-		self.fstar = -9.5083483926941064*self.ismax 			## approx
-		self.bounds = {'x':(0,10)}
-		self.name='sincos'
+class fourier(functions):
+    '''
+    Forrester function. 
+    
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self,sd=None):
+        self.bounds = {'x':(0,10)}
+        self.sd=0
         
-	def func(self,X):
-		X=np.asarray(X)
-		X = X.reshape((len(X),1))
-		n = X.shape[0]
-		fval = X*np.sin(X)+X*np.cos(2*X)
-		if self.sd ==0:
-			noise = np.zeros(n).reshape(n,1)
-		else:
-			noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
-		return self.ismax*fval.reshape(n,1) + noise
+        self.input_dim = 1
+        self.ismax=-1
+        
+
+        self.min = 4.795         ## approx
+        self.fstar = -9.5083483926941064*self.ismax             ## approx
+
+        self.name='fourier'
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
+        
+    def func(self,X):
+        X=np.asarray(X)
+        X = X.reshape((len(X),1))
+        n = X.shape[0]
+        fval = X*np.sin(X)+X*np.cos(2*X)
+        if self.sd ==0:
+            noise = np.zeros(n).reshape(n,1)
+        else:
+            noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+        return self.ismax*fval.reshape(n,1) + noise
         
         
 class branin(functions):
@@ -193,7 +168,9 @@ class branin(functions):
         if sd==None or sd==0:
             self.sd=0
         else:
-            self.sd=self.findSdev()
+            #self.sd=self.findSdev()
+            self.sd=sd
+            
         self.input_dim=2
         #if sd==None: self.sd = 0
         #else: self.sd=sd
@@ -204,8 +181,8 @@ class branin(functions):
         self.min=[9.424,2.475]
 
         self.name='branin'
-		
-		
+        
+        
     def func(self,X):
         
         X=np.asarray(X)
@@ -236,79 +213,80 @@ class branin(functions):
 
         
 class forrester(functions):
-	'''
-	Forrester function. 
-	:param sd: standard deviation, to generate noisy evaluations of the function.
-	'''
-	def __init__(self, sd=None):     
-		if sd==None or sd==0:
-			self.sd=0
-		else:
-			self.sd=self.findSdev()
-		self.ismax=-1
+    '''
+    Forrester function. 
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self, sd=None):     
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
+        self.ismax=-1
         
-		self.input_dim = 1		
-		self.min = 0.78 		## approx
-		self.fstar = -6.03*self.ismax 			## approx
-		self.bounds = {'x':(0,1)}
-		self.name='forrester'
-		#self.sd=0
+        self.input_dim = 1        
+        self.min = 0.78         ## approx
+        self.fstar = -6.03*self.ismax             ## approx
+        self.bounds = {'x':(0,1)}
+        self.name='forrester'
+        #self.sd=0
       
-	def func(self,X):
-		X=np.asarray(X)
-		X = X.reshape((len(X),1))
-		n = X.shape[0]
+    def func(self,X):
+        X=np.asarray(X)
+        X = X.reshape((len(X),1))
+        n = X.shape[0]
 
-		fval = ((6*X -2)**2)*np.sin(12*X-4)
-		if self.sd!=0:
-			noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
-			return fval*self.ismax+np.ravel(noise)
-		else:
-			return fval*self.ismax
+        fval = ((6*X -2)**2)*np.sin(12*X-4)
+        if self.sd!=0:
+            noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+            return fval*self.ismax+np.ravel(noise)
+        else:
+            return fval*self.ismax
 
 
 
 class rosenbrock(functions):
-	'''
-	rosenbrock function
+    '''
+    rosenbrock function
 
-	:param bounds: the box constraints to define the domain in which the function is optimized.
-	:param sd: standard deviation, to generate noisy evaluations of the function.
-	'''
-	def __init__(self,bounds=None,sd=0):
-		if sd==0:
-			self.sd=0
-		else:
-			self.sd=self.findSdev()
-		self.input_dim = 2
-		if bounds == None: self.bounds = OrderedDict([('x1',(-2.048,2.048)),('x2',(-2.048,2.048))])
-		else: self.bounds = bounds
-		self.min = [(0, 0)]
-		self.ismax=-1
+    :param bounds: the box constraints to define the domain in which the function is optimized.
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self,bounds=None,sd=0):
+        if sd==0:
+            self.sd=0
+        else:
+            self.sd=self.findSdev()
+        self.input_dim = 2
+        if bounds == None: self.bounds = OrderedDict([('x1',(-2.048,2.048)),('x2',(-2.048,2.048))])
+        else: self.bounds = bounds
+        self.min = [(0, 0)]
+        self.ismax=-1
 
-		self.fstar = 0
-		
-		self.name = 'Rosenbrock'
-		#self.sd=self.findSdev()
-		
-	def func(self,X):
-		X=np.asarray(X)
-		X = reshape(X,self.input_dim)
-		n=X.shape[0]
-		n=1
-		if len(X.shape)==1:# one observation
-			x1=X[0]
-			x2=X[1]
-		else:# multiple observations
-			x1=X[:,0]
-			x2=X[:,1]
-			n=X.shape[0]
-		fx = 100*(x2-x1**2)**2 + (x1-1)**2
-		if self.sd==0:
-			return fx*self.ismax
-		else:
-			noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
-			return fx*self.ismax+np.ravel(noise)
+        self.fstar = 0
+        
+        self.name = 'Rosenbrock'
+        #self.sd=self.findSdev()
+        
+    def func(self,X):
+        X=np.asarray(X)
+        X = reshape(X,self.input_dim)
+        n=X.shape[0]
+        n=1
+        if len(X.shape)==1:# one observation
+            x1=X[0]
+            x2=X[1]
+        else:# multiple observations
+            x1=X[:,0]
+            x2=X[:,1]
+            n=X.shape[0]
+        fx = 100*(x2-x1**2)**2 + (x1-1)**2
+        if self.sd==0:
+            return fx*self.ismax
+        else:
+            noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+            return fx*self.ismax+np.ravel(noise)
    
 
 
@@ -344,7 +322,7 @@ class beale(functions):
             x2=X[1]
         else:
             x1=X[:,0]
-            x2=X[:,1]	
+            x2=X[:,1]    
         fval = (1.5-x1+x1*x2)**2+(2.25-x1+x1*x2**2)**2+(2.625-x1+x1*x2**3)**2
         n=X.shape[0]
         
@@ -353,7 +331,7 @@ class beale(functions):
         else:
             noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
             return fval*self.ismax+np.ravel(noise) 
-			
+            
 
 
 class dropwave(functions):
@@ -377,7 +355,7 @@ class dropwave(functions):
 
         self.name = 'dropwave'
 
-		
+        
     def func(self,X):
         X=np.asarray(X)
         X = reshape(X,self.input_dim)
@@ -501,7 +479,8 @@ class sixhumpcamel(functions):
         if sd==None or sd==0:
             self.sd=0
         else:
-            self.sd=self.findSdev()
+            #self.sd=self.findSdev()
+            self.sd=sd
         self.input_dim = 2
         if bounds == None: self.bounds = OrderedDict([('x1',(-3,3)),('x2',(-2,2))])
         else: self.bounds = bounds
@@ -509,7 +488,7 @@ class sixhumpcamel(functions):
         self.ismax=-1
         self.fstar = -1.0316*self.ismax
         self.name = 'Six-hump camel'
-  		
+          
     def func(self,X):
         X=np.asarray(X)
         X = reshape(X,self.input_dim)
@@ -532,6 +511,120 @@ class sixhumpcamel(functions):
             noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
             return fval*self.ismax+np.ravel(noise)
 
+
+class mccormick(functions):
+    '''
+    Mccormick function
+    
+    :param bounds: the box constraints to define the domain in which the function is optimized.
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self,bounds=None,sd=0):
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
+        self.input_dim = 2
+        if bounds == None: self.bounds = [(-1.5,4),(-3,4)]
+        else: self.bounds = bounds
+        self.min = [(-0.54719,-1.54719)]
+        self.ismax=-1
+        self.fstar = -1.9133*self.ismax        
+        self.name = 'Mccormick'
+
+    def func(self,X):
+        X = reshape(X,self.input_dim)
+
+        x1=X[:,0]
+        x2=X[:,1]
+ 
+      
+        term1 = np.sin(x1 + x2)
+        term2 = (x1 - x2)**2
+        term3 = -1.5*x1
+        term4 = 2.5*x2
+        fval = term1 + term2 + term3 + term4 + 1
+        n=X.shape[0]
+        
+        if self.sd==0:
+            return fval*self.ismax
+        else:
+            noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+            return fval*self.ismax+np.ravel(noise)
+
+
+class powers(functions):
+    '''
+    Powers function
+    
+    :param bounds: the box constraints to define the domain in which the function is optimized.
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self,bounds=None,sd=0):
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            self.sd=self.findSdev()
+        self.input_dim = 2
+        if bounds == None: self.bounds = [(-1,1),(-1,1)]
+        else: self.bounds = bounds
+        self.min = [(0,0)]
+        self.fstar = 0
+         #if sd==None: self.sd = 0
+         #else: self.sd=sd
+        self.name = 'Sum of Powers'
+
+    def func(self,x):
+        x = reshape(x,self.input_dim)
+        n = x.shape[0]
+        if x.shape[1] != self.input_dim:
+            return 'wrong input dimension'
+        else:
+            x1 = x[:,0]
+            x2 = x[:,1]
+            fval = abs(x1)**2 + abs(x2)**3
+            if self.sd ==0:
+                noise = np.zeros(n).reshape(n,1)
+            else:
+                noise = np.random.normal(0,self.sd,n).reshape(n,1)
+            return fval.reshape(n,1) + noise
+
+class eggholder(functions):
+    def __init__(self,bounds=None,sd=0):
+        if sd==None or sd==0:
+            self.sd=0
+        else:
+            #self.sd=self.findSdev()
+            self.sd=sd
+        self.input_dim = 2
+        #self.bounds = {'x1':(-512,512),'x2':(-512,512)}
+        self.bounds = [(-512,512),(-512,512)]      
+        self.min = [(512,404.2319)]
+        self.ismax=-1
+        self.fstar = -959.6407*self.ismax       
+        self.name = 'Egg-holder'
+
+    def func(self,X):
+
+        X=np.asarray(X)
+        X = reshape(X,self.input_dim)
+
+        if len(X.shape)==1:
+            x1=X[0]
+            x2=X[1]
+        else:
+            x1=X[:,0]
+            x2=X[:,1]
+            
+        fval = -(x2+47) * np.sin(np.sqrt(abs(x2+x1/2+47))) + -x1 * np.sin(np.sqrt(abs(x1-(x2+47))))
+        n=X.shape[0]
+        
+        if self.sd==0:
+            return fval*self.ismax
+        else:
+            noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+            return fval*self.ismax+np.ravel(noise)
 
 class alpine1(functions):
     '''
@@ -559,10 +652,8 @@ class alpine1(functions):
 
         self.name='alpine1'
 
-		
+        
     def func(self,X):
-        X=np.asarray(X)
-
         X = reshape(X,self.input_dim)
         #n = X.shape[0]
         temp=(X*np.sin(X) + 0.1*X)
@@ -594,7 +685,7 @@ class alpine2(functions):
             self.bounds = bounds  =[(1,10)]*input_dim
         else: 
             self.bounds = bounds
-		
+        
 
         self.min = [(7.917)]*input_dim
         self.ismax=-1
@@ -602,8 +693,8 @@ class alpine2(functions):
         self.input_dim = input_dim
 
         self.name='Alpine2'
-	
-		
+    
+        
     def internal_func(self,X):
         fval = np.cumprod(np.sqrt(X))[self.input_dim-1]*np.cumprod(np.sin(X))[self.input_dim-1]  
         #fval = np.cumprod(np.sqrt(X)*np.sin(X))
@@ -625,7 +716,7 @@ class alpine2(functions):
             noise = np.random.normal(0,self.sd,n).reshape(n,1)
         return self.ismax*fval.reshape(n,1) + noise
 
-class gSobol:
+class gSobol(functions):
     '''
     gSolbol function
    
@@ -652,20 +743,17 @@ class gSobol:
         self.name='gSobol'
 
     def func(self,X):
-        X=np.asarray(X)
-        X=X.reshape((-1,self.input_dim))
-
-        
+        X = reshape(X,self.input_dim)
         n = X.shape[0]
         aux = (abs(4*X-2)+np.ones(n).reshape(n,1)*self.a)/(1+np.ones(n).reshape(n,1)*self.a)
         fval =  np.cumprod(aux,axis=1)[:,self.input_dim-1]
-        fval=fval.reshape(n,1)
+
+        n=X.shape[0]
         if self.sd ==0:
             noise = np.zeros(n).reshape(n,1)
         else:
             noise = np.random.normal(0,self.sd,n).reshape(n,1)
-            
-        return self.ismax*fval+noise
+        return self.ismax*fval.reshape(n,1) + noise
 
 #####
 class ackley(functions):
@@ -680,7 +768,8 @@ class ackley(functions):
         if sd==None or sd==0:
             self.sd=0
         else:
-            self.sd=self.findSdev()
+            self.sd=sd
+            #self.sd=self.findSdev()
             
         if bounds == None: 
             self.bounds =[(-32.768,32.768)]*self.input_dim
@@ -718,7 +807,8 @@ class hartman_6d:
         if sd==None or sd==0:
             self.sd=0
         else:
-            self.sd=self.findSdev()
+            self.sd=sd
+            #self.sd=self.findSdev()
             
         self.input_dim = 6
 
@@ -747,9 +837,9 @@ class hartman_6d:
              [17, 8, 0.05, 10, 0.1, 14]]
         A=np.asarray(A)
         P = [[1312, 1696, 5569, 124, 8283, 5886],
-			[2329, 4135, 8307, 3736, 1004, 9991],
-			[2348, 1451, 3522, 2883, 3047, 6650],
-			[4047, 8828, 8732, 5743, 1091, 381]]
+            [2329, 4135, 8307, 3736, 1004, 9991],
+            [2348, 1451, 3522, 2883, 3047, 6650],
+            [4047, 8828, 8732, 5743, 1091, 381]]
 
         P=np.asarray(P)
         c=10**(-4)       
@@ -766,18 +856,83 @@ class hartman_6d:
                     Aij = A[ii, jj]
                     Pij = P[ii, jj]
                     inner = inner + Aij*(xj-Pij)**2
-				
+                
                 new = alpha[ii] * np.exp(-inner)
                 outer = outer + new
 
             fval[idx] = -(2.58 + outer) / 1.94;
       
+        noise = np.random.normal(0,self.sd,n).reshape(n,1)
+
+        if n==1:
+            return self.ismax*(fval[0][0])+noise
+        else:
+            return self.ismax*(fval)+noise
+        
+        
+"""
+class hartman_4d:
+    '''
+    Ackley function 
+
+    :param sd: standard deviation, to generate noisy evaluations of the function.
+    '''
+    def __init__(self,  bounds=None,sd=None):
+        self.input_dim = 4
+
+        if bounds == None: 
+            self.bounds =[(0,1)]*self.input_dim
+        else: 
+            self.bounds = bounds
+
+        self.min = [(0.)*self.input_dim]
+        self.fstar = -3.32237
+        self.ismax=-1
+        self.name='hartman_4d'
+        
+    def func(self,X):
+        X = reshape(X,self.input_dim)
+        n = X.shape[0]
+
+        alpha = [1.0, 1.2, 3.0, 3.2];
+        
+        A = [[10, 3, 17, 3.5, 1.7, 8],
+             [0.05, 10, 17, 0.1, 8, 14],
+             [3, 3.5, 1.7, 10, 17, 8],
+             [17, 8, 0.05, 10, 0.1, 14]]
+        A=np.asarray(A)
+        P = [[1312, 1696, 5569, 124, 8283, 5886],
+            [2329, 4135, 8307, 3736, 1004, 9991],
+            [2348, 1451, 3522, 2883, 3047, 6650],
+            [4047, 8828, 8732, 5743, 1091, 381]]
+
+
+
+        P=np.asarray(P)
+        c=10**(-4)       
+        P=np.multiply(P,c)
+        outer = 0;
+        
+
+        fval  =np.zeros((n,1))        
+        for idx in range(n):
+            X_idx=X[idx,:]
+            outer = 0;
+            for ii in range(4):
+                inner = 0;
+                for jj in range(4):
+                    xj = X_idx[jj]
+                    Aij = A[ii, jj]
+                    Pij = P[ii, jj]
+                inner = inner + Aij*(xj-Pij)**2
+                new = alpha[ii] * np.exp(-inner)
+                outer = outer + new
+            fval[idx] = (1.1 - outer) / 0.839;
         if n==1:
             return self.ismax*(fval[0][0])
         else:
             return self.ismax*(fval)
-        
-        
+"""            
             
 class hartman_3d(functions):
     '''
@@ -790,16 +945,16 @@ class hartman_3d(functions):
         if sd==None or sd==0:
             self.sd=0
         else:
-            self.sd=self.findSdev()
+            self.sd=sd
+            #self.sd=self.findSdev()
             
         self.input_dim = 3
-        self.sd=0
         if bounds == None: 
             self.bounds =[(0,1)]*self.input_dim
         else: 
             self.bounds = bounds
 
-        self.min = [(0.)*self.input_dim]
+        self.min = [0.114614,0.555649,0.852547]
         self.ismax=-1
         
         self.fstar = -3.86278*self.ismax
@@ -820,9 +975,9 @@ class hartman_3d(functions):
              [0.1, 10, 35]]
         A=np.asarray(A)
         P = [[3689, 1170, 2673],
-			[4699, 4387, 7470],
-			[1091, 8732, 5547],
-			[381, 5743, 8828]]
+            [4699, 4387, 7470],
+            [1091, 8732, 5547],
+            [381, 5743, 8828]]
 
         P=np.asarray(P)
         c=10**(-4)       
@@ -839,61 +994,61 @@ class hartman_3d(functions):
                     Aij = A[ii, jj]
                     Pij = P[ii, jj]
                     inner = inner + Aij*(xj-Pij)**2
-				
+                
                 new = alpha[ii] * np.exp(-inner)
                 outer = outer + new
 
             fval[idx] = -outer;
         
-        #noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
-        noise=0
+        noise = np.random.normal(0,self.sd,n).reshape(n,1)
+        #noise=0
         if n==1:
             return self.ismax*(fval[0][0])+noise
         else:
             return self.ismax*(fval)+noise
-		
+        
 class mixture(functions):
-	'''
-	a scalable gaussian mixture function
-	
-	:param sd: standard deviation to generate noisy exaluations of the functions
-	:param peaks: number of gaussian peaks used
-	'''
-	def __init__(self,bounds=None, peaks=3):
-		self.input_dim=2
-		self.peaks=peaks
-		self.sd=0
-		if bounds == None:
-			self.bounds =[(0,1)]*self.input_dim
-		else:
-			self.bounds = bounds
-		self.min = [(0.)*self.input_dim]
-		self.fstar=-1
-		self.ismax=-1
-		self.name="mixture"
-		self.sd=self.findSdev()
-		
-	def func(self,X):
-		X = reshape(X,self.input_dim)
-		n = X.shape[0]
-		y=2*multivariate_normal.pdf(X,mean=[0.5,0.5],cov=0.07*np.eye(2))
-		if self.peaks>=2:
-			y+=1.8*multivariate_normal.pdf(X,mean=[0.2,0.2],cov=0.03*np.eye(2))
-		if self.peaks>=3:
-			y+=1.7*multivariate_normal.pdf(X,mean=[0.7,0.7],cov=0.07*np.eye(2))
-		if self.peaks>=4:
-			y+=1*multivariate_normal.pdf(X,mean=[0.8,0.5],cov=0.02*np.eye(2))
-		if self.peaks>=5:
-			y+=1.7*multivariate_normal.pdf(X,mean=[0.4,0.6],cov=0.005*np.eye(2))
-		if self.peaks>=6:
-			y+=1.75*multivariate_normal.pdf(X,mean=[0.3,0.4],cov=0.0012*np.eye(2))
-		if self.peaks>=7:
-			y+=1.75*multivariate_normal.pdf(X,mean=[0.9,0.8],cov=0.01*np.eye(2))
-		if self.peaks>=8:
-			y+=1.75*multivariate_normal.pdf(X,mean=[0.2,0.6],cov=0.01*np.eye(2))
-		if self.peaks>=9:
-			y+=1.75*multivariate_normal.pdf(X,mean=[0.9,0.3],cov=0.01*np.eye(2))
-		return y
+    '''
+    a scalable gaussian mixture function
+    
+    :param sd: standard deviation to generate noisy exaluations of the functions
+    :param peaks: number of gaussian peaks used
+    '''
+    def __init__(self,bounds=None, peaks=3):
+        self.input_dim=2
+        self.peaks=peaks
+        self.sd=0
+        if bounds == None:
+            self.bounds =[(0,1)]*self.input_dim
+        else:
+            self.bounds = bounds
+        self.min = [(0.)*self.input_dim]
+        self.fstar=-1
+        self.ismax=-1
+        self.name="mixture"
+        self.sd=self.findSdev()
+        
+    def func(self,X):
+        X = reshape(X,self.input_dim)
+        n = X.shape[0]
+        y=2*multivariate_normal.pdf(X,mean=[0.5,0.5],cov=0.07*np.eye(2))
+        if self.peaks>=2:
+            y+=1.8*multivariate_normal.pdf(X,mean=[0.2,0.2],cov=0.03*np.eye(2))
+        if self.peaks>=3:
+            y+=1.7*multivariate_normal.pdf(X,mean=[0.7,0.7],cov=0.07*np.eye(2))
+        if self.peaks>=4:
+            y+=1*multivariate_normal.pdf(X,mean=[0.8,0.5],cov=0.02*np.eye(2))
+        if self.peaks>=5:
+            y+=1.7*multivariate_normal.pdf(X,mean=[0.4,0.6],cov=0.005*np.eye(2))
+        if self.peaks>=6:
+            y+=1.75*multivariate_normal.pdf(X,mean=[0.3,0.4],cov=0.0012*np.eye(2))
+        if self.peaks>=7:
+            y+=1.75*multivariate_normal.pdf(X,mean=[0.9,0.8],cov=0.01*np.eye(2))
+        if self.peaks>=8:
+            y+=1.75*multivariate_normal.pdf(X,mean=[0.2,0.6],cov=0.01*np.eye(2))
+        if self.peaks>=9:
+            y+=1.75*multivariate_normal.pdf(X,mean=[0.9,0.3],cov=0.01*np.eye(2))
+        return y
     
 class gaussian(functions):
     '''
@@ -917,6 +1072,6 @@ class gaussian(functions):
     def func(self,X):
         X = reshape(X,self.input_dim)
         n = X.shape[0]
-        noise = np.random.normal(0,0.1*self.sd,n).reshape(n,1)
+        noise = np.random.normal(0,self.sd,n).reshape(n,1)
         y=multivariate_normal.pdf(X,mean=0.5*np.ones(self.input_dim),cov=np.eye(self.input_dim))
         return y
