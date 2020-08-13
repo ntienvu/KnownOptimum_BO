@@ -32,6 +32,13 @@ Then, we can plot all the results using scripts in the "plot" folder.
 * scipy
 * matplotlib
 
+
+# Error with scipy=1.15
+```
+ValueError: `f0` passed has more than 1 dimension.
+```
+If this is the case, please downgrade to scipy=1.14.1
+
 # Paper and Presentation
 Visit https://proceedings.icml.cc/static/paper_files/icml/2020/2351-Paper.pdf
 
