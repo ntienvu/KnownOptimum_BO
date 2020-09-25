@@ -105,7 +105,9 @@ class AcquisitionFunction(object):
         beta_t = np.log(len(gp.Y))
       
         #beta=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
-        return mean + np.sqrt(beta_t) * np.sqrt(var) 
+        temp=mean + np.sqrt(beta_t) * np.sqrt(var)
+        #print("input",xTest.shape,"output",temp.shape)
+        return  temp
     
     @staticmethod
     def _cbm(x, gp, target): # confidence bound minimization
@@ -132,7 +134,8 @@ class AcquisitionFunction(object):
         var2 = np.maximum(var, 1e-9 + 0 * var)
         z = ( fstar-mean)/np.sqrt(var2)        
         out=(fstar-mean) * (norm.cdf(z)) + np.sqrt(var2) * norm.pdf(z)
-     
+        #print(out.shape)
+
         return -1*out # for minimization problem
                     
     @staticmethod
@@ -144,5 +147,7 @@ class AcquisitionFunction(object):
         out=(mean - y_max) * norm.cdf(z) + np.sqrt(var2) * norm.pdf(z)
         
         out[var2<1e-10]=0
+        
+        #print(out.shape)
         return out
        
