@@ -150,7 +150,7 @@ def run_experiment(bo,yoptimal=0,n_init=3,NN=10,runid=1):
     return fxoptimal, elapsed_time
 
     
-def yBest_Iteration(YY,BatchSzArray,IsPradaBO=0,Y_optimal=0,step=3):
+def yBest_Iteration(YY,BatchSzArray,step=3):
     
     nRepeat=len(YY)
     
