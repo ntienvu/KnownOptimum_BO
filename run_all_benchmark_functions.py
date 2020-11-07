@@ -34,7 +34,7 @@ myfunction_list=[]
 #myfunction_list.append(functions.branin())
 #myfunction_list.append(functions.hartman_3d())
 #myfunction_list.append(functions.ackley(input_dim=5))
-#myfunction_list.append(functions.alpine1(input_dim=5))
+myfunction_list.append(functions.alpine1(input_dim=5))
 #myfunction_list.append(functions.hartman_6d())
 #myfunction_list.append(functions.gSobol(a=np.array([1,1,1,1,1])))
 #myfunction_list.append(functions.gSobol(a=np.array([1,1,1,1,1,1,1,1,1,1])))
