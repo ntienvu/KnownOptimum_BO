@@ -3,6 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='bayes_opt',
     version='1',
+    packages=find_packages(),
 #     packages = ["bayes_opt",
 #     "bayes_opt.test_functions",
 # 	"bayes_opt.utility",
