@@ -29,10 +29,7 @@ class AcquisitionFunction(object):
             raise NotImplementedError(err)
         else:
             self.acq_name = acq_name
-            
-        #self.dim=acq['dim']
-        
-        
+                    
     def acq_kind(self,gp,x):
             
         y_max=np.max(gp.Y)
@@ -52,78 +49,51 @@ class AcquisitionFunction(object):
             return self._ei(x, gp, y_max=gp.fstar)
         if self.acq_name == 'erm'  or self.acq_name=='kov_ei_cb':
             return self._erm(x, gp, fstar=gp.fstar)
-    #    if acq_name == 'pure_exploration':
-    #        return _pure_exploration(x, gp) 
-    #   
-    #    if acq_name == 'mu':
-    #        return _mu(x, gp)
-    
     
     @staticmethod
     def _lcb(gp,xTest,fstar_scale=0):
         mean, var = gp.predict(xTest)
         var.flags['WRITEABLE']=True
-        #var=var.copy()
         var[var<1e-10]=0
-#        mean=np.atleast_2d(mean).T
-#        var=np.atleast_2d(var).T
+
         #beta_t = gp.X.shape[1] * np.log(len(gp.Y))
         beta_t = 2 * np.log(len(gp.Y));
-    
-        return mean - np.sqrt(beta_t) * np.sqrt(var) 
-    
-#     @staticmethod
-#    def _ucb(gp,xTest,fstar_scale=0):
-#        dim=gp.dim
-#        xTest=np.reshape(xTest,(-1,dim))
-#        mean, var= gp.predict(xTest)
-#        var.flags['WRITEABLE']=True
-#        #var=var.copy()
-#        var[var<1e-10]=0
-#        mean=np.atleast_2d(mean).T
-#        var=np.atleast_2d(var).T                
-#        
-#        # Linear in D, log in t https://github.com/kirthevasank/add-gp-bandits/blob/master/BOLibkky/getUCBUtility.m
-#        beta_t =np.log(len(gp.Y))
-#      
-#        #beta=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
-#        return mean + np.sqrt(beta_t) * np.sqrt(var) 
         
+        output = mean - np.sqrt(beta_t) * np.sqrt(var) 
+    
+        return output.ravel()
+    
     @staticmethod
     def _gp_ucb(gp,xTest,fstar_scale=0):
         #dim=gp.dim
         #xTest=np.reshape(xTest,(-1,dim))
-        mean, var= gp.predict(xTest)
+        mean, var = gp.predict(xTest)
         var.flags['WRITEABLE']=True
         #var=var.copy()
-        var[var<1e-10]=0
-        #mean=np.atleast_2d(mean).T
-        #var=np.atleast_2d(var).T                
+        var[var<1e-10] = 0             
         
         # Linear in D, log in t https://github.com/kirthevasank/add-gp-bandits/blob/master/BOLibkky/getUCBUtility.m
         #beta_t = gp.X.shape[1] * np.log(len(gp.Y))
         beta_t = np.log(len(gp.Y))
       
         #beta=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
-        temp=mean + np.sqrt(beta_t) * np.sqrt(var)
+        output = mean + np.sqrt(beta_t) * np.sqrt(var)
         #print("input",xTest.shape,"output",temp.shape)
-        return  temp
+        return  output.ravel()
     
     @staticmethod
     def _cbm(x, gp, target): # confidence bound minimization
         mean, var = gp.predict(x)
         var.flags['WRITEABLE']=True
-        var[var<1e-10]=0
-#        mean=np.atleast_2d(mean).T
-#        var=np.atleast_2d(var).T                
+        var[var<1e-10]=0            
         
         # Linear in D, log in t https://github.com/kirthevasank/add-gp-bandits/blob/master/BOLibkky/getUCBUtility.m
         #beta_t = gp.X.shape[1] * np.log(len(gp.Y))
         beta_t = np.log(len(gp.Y))
       
         #beta=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
-        return -np.abs(mean-target) - np.sqrt(beta_t) * np.sqrt(var) 
-    
+        output = -np.abs(mean-target) - np.sqrt(beta_t) * np.sqrt(var) 
+        return output.ravel()
        
     @staticmethod
     def _erm(x, gp, fstar):
@@ -134,9 +104,8 @@ class AcquisitionFunction(object):
         var2 = np.maximum(var, 1e-9 + 0 * var)
         z = ( fstar-mean)/np.sqrt(var2)        
         out=(fstar-mean) * (norm.cdf(z)) + np.sqrt(var2) * norm.pdf(z)
-        #print(out.shape)
 
-        return -1*out # for minimization problem
+        return -1*out.ravel() # for minimization problem
                     
     @staticmethod
     def _ei(x, gp, y_max):
@@ -148,6 +117,4 @@ class AcquisitionFunction(object):
         
         out[var2<1e-10]=0
         
-        #print(out.shape)
-        return out
-       
+        return out.ravel()

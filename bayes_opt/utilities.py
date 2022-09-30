@@ -191,7 +191,7 @@ def unique_rows(a):
 
 
 
-def print_result_sequential(bo,myfunction,Score,acq_type):
+def print_result_sequential(bo,func,Score,acq_type):
     
     if 'ystars' in acq_type:
         acq_type['ystars']=[]
@@ -203,7 +203,7 @@ def print_result_sequential(bo,myfunction,Score,acq_type):
     #GAP=Score["GAP"]
     MyTime=Score["MyTime"]
     
-    print('{:s} {:d}'.format(myfunction.name,myfunction.input_dim))
+    print('{:s} {:d}'.format(func.name,func.input_dim))
     print(acq_type['name'],acq_type['IsTGP'])
     
  
@@ -211,10 +211,10 @@ def print_result_sequential(bo,myfunction,Score,acq_type):
 
     
   
-    if myfunction.ismax==1:
-        print('MaxBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx)))    
+    if func.ismax==1:
+        print('MaxBest={:.4f}({:.2f})'.format(func.ismax*np.mean(MaxFx),np.std(MaxFx)))    
     else:
-        print('MinBest={:.4f}({:.2f})'.format(myfunction.ismax*np.mean(MaxFx),np.std(MaxFx)))
+        print('MinBest={:.4f}({:.2f})'.format(func.ismax*np.mean(MaxFx),np.std(MaxFx)))
             
     
     if 'MyOptTime' in Score:
@@ -222,9 +222,9 @@ def print_result_sequential(bo,myfunction,Score,acq_type):
         print('OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime)))
         
     if acq_type['IsTGP']==1: # using Transformed GP
-        strFile="{:s}_{:d}_{:s}_TGP.pickle".format(myfunction.name,myfunction.input_dim,acq_type['name'])
+        strFile="{:s}_{:d}_{:s}_TGP.pickle".format(func.name,func.input_dim,acq_type['name'])
     else: # using GP
-        strFile="{:s}_{:d}_{:s}_GP.pickle".format(myfunction.name,myfunction.input_dim,acq_type['name'])
+        strFile="{:s}_{:d}_{:s}_GP.pickle".format(func.name,func.input_dim,acq_type['name'])
     
     if sys.version_info[0] < 3:
         version=2

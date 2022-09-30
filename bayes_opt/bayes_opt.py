@@ -112,7 +112,9 @@ class BayesOpt:
 
         self.gp=GaussianProcess(self.scaleSearchSpace,verbose=verbose)
 
-    
+    # =============================================================================
+    #   Function init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
+    # =============================================================================
     def init(self, n_init_points=3,seed=1):
         """      
         Input parameters
@@ -135,8 +137,9 @@ class BayesOpt:
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
         self.X = self.Xscaler.transform(init_X)
 
-       
-        
+    # =============================================================================
+    #   Function init the BayesOpt class with the input X and output Y
+    # =============================================================================
     def init_with_data(self, init_X,init_Y,isPermutation=False):
         """      
         Input parameters
@@ -146,15 +149,6 @@ class BayesOpt:
         """
           
         #init_Y=(init_Y-np.mean(init_Y))/np.std(init_Y)
-            
-        #outlier removal
-#        idx1=np.where( init_Y<=3)[0]
-#        init_Y=init_Y[idx1]
-#        init_X=init_X[idx1]
-#        
-#        idx=np.where( init_Y>=-3)[0]
-#        init_X=init_X[idx]
-#        init_Y=init_Y[idx]
         
         self.Y_ori = np.asarray(init_Y)
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
@@ -184,7 +178,6 @@ class BayesOpt:
         x: recommented point for evaluation
         """
 
-        #self.Y=np.reshape(self.Y,(-1,1))
         self.gp=GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
         ur = unique_rows(self.X)
         self.gp.fit(self.X[ur], self.Y[ur])
@@ -222,7 +215,6 @@ class BayesOpt:
 
         return x_max#,x_max_ori
     
-    
     def plot_acq_1d(self):
         x1_scale = np.linspace(self.scaleSearchSpace[0,0], self.scaleSearchSpace[0,1], 60)
         x1_scale=np.reshape(x1_scale,(-1,1))
@@ -236,13 +228,7 @@ class BayesOpt:
         # Plot the surface.
         CS_acq=ax.plot(x1_ori,acq_value.reshape(x1_ori.shape))
         ax.scatter(self.X_ori[:,0],self.Y[:],marker='o',color='r',s=130,label='Obs')
-      
-#        temp_xaxis=np.concatenate([x1_ori, x1_ori[::-1]])
-#        temp_yaxis=np.concatenate([mean_ori - 1.9600 * std, (mean_ori + 1.9600 * std)[::-1]])
-        #ax.scatter(self.Xdrv,Y_ori_at_drv,marker='*',s=200,color='m',label='Derivative Obs')  
-        #ax.fill(temp_xaxis, temp_yaxis,alpha=.3, fc='g', ec='None', label='95% CI')
-
-
+   
         ax.set_ylabel('Acquisition Function',fontsize=18)
         ax.set_xlabel('Beta',fontsize=18)
         

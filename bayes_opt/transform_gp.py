@@ -33,22 +33,6 @@ class TransformedGP(object):
         self.fstar=fstar
         self.IsZeroMean=IsZeroMean
 
-        
-#        self.KK_x_x=[]
-#        self.KK_x_x_inv=[]
-#    
-#        self.fstar=0
-#        self.X=[]
-#        self.Y=[]
-#        self.G=[]
-#        self.lengthscale_old=self.lengthscale
-#        self.flagOptimizeHyperFirst=0
-#        
-#        self.alpha=[] # for Cholesky update
-#        self.L=[] # for Cholesky update LL'=A
-#    def set_optimum_value(self,fstar_scaled):
-#        self.fstar_scaled=fstar_scaled
-
     def cov_RBF(self,x1, x2,hyper):        
         """
         Radial Basic function kernel (or SE kernel)
@@ -62,7 +46,6 @@ class TransformedGP(object):
         
         return variance*np.exp(-np.square(Euc_dist)/lengthscale)
         
-    
         
     def fit(self,X,Y,fstar=None,IsOptimize=0):
         """
@@ -83,11 +66,8 @@ class TransformedGP(object):
         if fstar is not None:
             self.fstar=fstar
         self.G=np.sqrt(2.0*(fstar-Y))
-        #self.G=np.log(1.0*(fstar-Y))
         
-        # print("only SE kernel is implemented!")
-        #Euc_dist=euclidean_distances(X,X)
-        
+        # print("only SE kernel is implemented!")        
         if IsOptimize:
             self.hyper['lengthscale']=self.optimise()         # optimise GP hyperparameters
         #self.hyper['epsilon'],self.hyper['lengthscale'],self.noise_delta=self.optimise()         # optimise GP hyperparameters
@@ -139,7 +119,6 @@ class TransformedGP(object):
 
         logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
-        #print(hyper_values,logmarginal)
         return np.asscalar(logmarginal)
    
         
@@ -162,7 +141,7 @@ class TransformedGP(object):
         init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
         logllk=[0]*init_theta.shape[0]
         for ii,val in enumerate(init_theta): 
-            logllk[ii]=self.log_llk(self.X,self.Y,hyper_values=val) #noise_delta=self.noise_delta
+            logllk[ii] = self.log_llk(self.X,self.Y,hyper_values=val) #noise_delta=self.noise_delta
             
         x0=init_theta[np.argmax(logllk)]
 
@@ -174,8 +153,6 @@ class TransformedGP(object):
             
         return res.x  
 
-
-  
     def predict_g2(self,xTest,eval_MSE=True):
         """
         compute predictive mean and variance
@@ -192,28 +169,21 @@ class TransformedGP(object):
         
         # prevent singular matrix
         ur = unique_rows(self.X)
-        X=self.X[ur]
-        #Y=self.Y[ur]
-        #G=self.G[ur]
+        X = self.X[ur]
             
         # print("only SE kernel is implemented!")
-        Euc_dist=euclidean_distances(xTest,xTest)
-        KK_xTest_xTest=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(xTest.shape[0])*self.noise_delta
-        
-        Euc_dist_test_train=euclidean_distances(xTest,X)
-        KK_xTest_xTrain=np.exp(-np.square(Euc_dist_test_train)/self.lengthscale)        
+        KK_xTest_xTest = self.mycov(xTest,xTest,self.hyper)+np.eye(xTest.shape[0])*self.noise_delta
+        KK_xTest_xTrain = self.mycov(xTest,self.X,self.hyper)      
         
         # using Cholesky update
-        meanG=np.dot(KK_xTest_xTrain,self.alphaG)
+        meanG = np.dot(KK_xTest_xTrain,self.alphaG)
         
         v=np.linalg.solve(self.L,KK_xTest_xTrain.T)
-        varG=KK_xTest_xTest-np.dot(v.T,v)
-        
+        varG = KK_xTest_xTest-np.dot(v.T,v)
         
         # compute mF, varF
         mf=self.fstar-0.5*meanG*meanG
         varf=meanG*varG*meanG
-        #varf=varG
 
         return mf.ravel(),np.diag(varf)     
     
@@ -240,26 +210,21 @@ class TransformedGP(object):
         KK_xTest_xTest=self.mycov(Xtest,Xtest,self.hyper)+np.eye(Xtest.shape[0])*self.noise_delta
         KK_xTest_xTrain=self.mycov(Xtest,self.X,self.hyper)
         
-       
         # using Cholesky update
         
         if self.IsZeroMean:
             meanG=np.dot(KK_xTest_xTrain,self.alphaG) # zero prior mean
         else:
             meanG=np.dot(KK_xTest_xTrain,self.alphaG)+np.sqrt(2*self.fstar) # non zero prior mean
-        
 
         v=np.linalg.solve(self.L,KK_xTest_xTrain.T)
         varG=KK_xTest_xTest-np.dot(v.T,v)
         
         # compute mF, varF
         mf=self.fstar-0.5*np.square(meanG)
-        #mf=self.fstar-np.exp(meanG)
         
         # using linearlisation
         varf=meanG*varG*meanG 
-        # using moment matching
-        
     
         return np.reshape(mf.ravel(),(-1,1)),np.reshape(np.diag(varf)  ,(-1,1))
 
@@ -280,25 +245,18 @@ class TransformedGP(object):
         # prevent singular matrix
         ur = unique_rows(self.X)
         X=self.X[ur]
-        #Y=self.Y[ur]
-        #G=self.G[ur]
-    
         
         #print("only SE kernel is implemented")
-        Euc_dist=euclidean_distances(xTest,xTest)
-        KK_xTest_xTest=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(xTest.shape[0])*self.noise_delta
+        KK_xTest_xTest=self.mycov(xTest,xTest,self.hyper)+np.eye(xTest.shape[0])*self.noise_delta
         
-        Euc_dist_test_train=euclidean_distances(xTest,X)
-        KK_xTest_xTrain=np.exp(-np.square(Euc_dist_test_train)/self.lengthscale)
+        KK_xTest_xTrain=self.mycov(xTest,self.X,self.hyper)
 
-        
         meanG=np.dot(KK_xTest_xTrain,self.alphaG)+np.sqrt(2*self.fstar) # non zero prior mean
 
         v=np.linalg.solve(self.L,KK_xTest_xTrain.T)
         varG=KK_xTest_xTest-np.dot(v.T,v)
         
         return meanG.ravel(),np.diag(varG)  
-
     
     def posterior(self,x):
         # compute mean function and covariance function

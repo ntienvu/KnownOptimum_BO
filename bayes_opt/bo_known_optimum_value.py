@@ -4,26 +4,22 @@ Created on Tue Mar 29 11:49:58 2018
 
 """
 
-
 import numpy as np
-#from scipy.optimize import minimize
-#from bayes_opt.acquisition_functions import AcquisitionFunction, unique_rows
 from bayes_opt.transform_gp import TransformedGP
 from bayes_opt.gp import GaussianProcess
-#from bayes_opt.acquisition_maximization import acq_max,acq_max_with_name
-#from bayes_opt.utilities import acq_max_scipy
 import time
 from sklearn.preprocessing import MinMaxScaler
 from bayes_opt.utilities import unique_rows
 from bayes_opt.utilities import acq_max_with_name
 
 #======================================================================================================
-#======================================================================================================
-#======================================================================================================
-#======================================================================================================
 counter = 0
 
-
+# =============================================================================
+#   BayesOpt with known optimum value, this is adapted from 
+#   https://github.com/ntienvu/KnownOptimum_BO
+#   Nguyen et al. Knowing the what but not the where in Bayesian optimization. ICML 2020
+# =============================================================================
 class BayesOpt_KnownOptimumValue(object):
 
     #def __init__(self, gp_params,SearchSpace, acq_func,verbose=1):
@@ -70,10 +66,9 @@ class BayesOpt_KnownOptimumValue(object):
         else:
             self.SearchSpace=np.asarray(SearchSpace)
             
-            
         self.dim = len(SearchSpace)
 
-        self.fstar=fstar
+        self.fstar = fstar
     
         # create a scalebounds 0-1
         scalebounds=np.array([np.zeros(self.dim), np.ones(self.dim)])
@@ -81,7 +76,7 @@ class BayesOpt_KnownOptimumValue(object):
         
         scaler = MinMaxScaler()
         scaler.fit(self.SearchSpace.T)
-        self.Xscaler=scaler
+        self.Xscaler = scaler
         
         # Some function to be optimized
         self.f = func
@@ -89,7 +84,7 @@ class BayesOpt_KnownOptimumValue(object):
 
       
         # store X in original scale
-        self.X_ori= None
+        self.X_ori = None
 
         # store X in 0-1 scale
         self.X = None
@@ -101,18 +96,17 @@ class BayesOpt_KnownOptimumValue(object):
         # y original scale
         self.Y_ori = None
 
-        self.time_opt=0
+        self.time_opt = 0
 
-        self.IsZeroMean=False # this will be automatically changed
+        self.IsZeroMean = False # this will be automatically changed
 
         # Gaussian Process class
-        self.IsTGP=IsTGP
+        self.IsTGP = IsTGP
         if self.IsTGP==1:
-            self.gp=TransformedGP(self.scaleSearchSpace,verbose=verbose,IsZeroMean=self.IsZeroMean)
+            self.gp = TransformedGP(self.scaleSearchSpace,verbose=verbose,IsZeroMean=self.IsZeroMean)
         else:
             self.gp=GaussianProcess(self.scaleSearchSpace,verbose=verbose)
 
-            
         # acquisition function
         self.acq_func = None
     
@@ -154,21 +148,15 @@ class BayesOpt_KnownOptimumValue(object):
         else:
             self.gp.IsZeroMean=False
             self.IsZeroMean=False
-            
 
         #self.gp.optimise()
             
         mu, sigma2 = self.gp.predict(Xnew)
         return mu, np.sqrt(sigma2)
     
-#    def posterior_tgp_g(self, Xnew):
-#        fstar_scaled=(self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
-#
-#        self.tgp.fit(self.X, self.Y,fstar_scaled)
-#        mu, sigma2 = self.tgp.predict_G(Xnew)
-#        return mu, np.sqrt(sigma2)
-        
-
+    # =============================================================================
+    #   Function init the BayesOpt class with the input X and output Y
+    # =============================================================================
     def init_with_data(self, init_X,init_Y):
         """      
         Input parameters
@@ -188,8 +176,9 @@ class BayesOpt_KnownOptimumValue(object):
         # add y_optimum into Y set
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
 
-
-        
+    # =============================================================================
+    #   Function init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
+    # =============================================================================
     def init(self, n_init_points=3, seed=1):
         """      
         Input parameters
@@ -242,8 +231,6 @@ class BayesOpt_KnownOptimumValue(object):
         x_ucb,y_ucb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ucb",IsReturnY=True,fstar_scaled=fstar_scaled)
         x_lcb,y_lcb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="lcb",IsReturnY=True,IsMax=False)
         
-        #start_opt=time.time()
-
         if y_ucb<fstar_scaled: # f* > ucb we initially use EI with the vanilla GP until the fstar is covered by the upper bound
             x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ei")
             self.marker.append(0)
@@ -289,92 +276,3 @@ class BayesOpt_KnownOptimumValue(object):
         
         return x_max   
         
-    def select_next_point_bk(self):
-        """
-        Main optimization method.
-
-        Input parameters
-        ----------
-        gp_params: parameter for Gaussian Process
-
-        Returns
-        -------
-        x: recommented point for evaluation
-        """
-
-        fstar_scaled=(self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
-            
-        # init a new Gaussian Process
-        if self.IsTGP==1:
-            self.gp=TransformedGP(self.scaleSearchSpace,verbose=self.verbose,IsZeroMean=self.IsZeroMean)
-            # Find unique rows of X to avoid GP from breaking
-            ur = unique_rows(self.X)
-            self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
-        else:
-            self.gp=GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
-            ur = unique_rows(self.X)
-            self.gp.fit(self.X[ur], self.Y[ur])
-            
-
-        # check if the surrogate hit the optimum value f*, check if UCB and LCB cover the fstar
-        x_ucb,y_ucb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ucb",IsReturnY=True,fstar_scaled=fstar_scaled)
-        x_lcb,y_lcb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="lcb",IsReturnY=True,IsMax=False)
-        
-        if y_lcb>fstar_scaled or y_ucb<fstar_scaled: # f* > ucb
-            self.gp.IsZeroMean=True
-            self.IsZeroMean=True
-
-            if self.verbose==1:
-                print("y_lcb={} y_ucb={} fstar_scaled={:.4f}".format(y_lcb,y_ucb,fstar_scaled))
-                print("ZeroMean")
-        else:
-            self.gp.IsZeroMean=False
-            self.IsZeroMean=False
-
-        # optimize GP parameters after 3*dim iterations
-        if  len(self.Y)%(3*self.dim)==0:
-            self.gp.optimise()
- 
-        # Set acquisition function
-        start_opt=time.time()
-        # run the acquisition function for the first time to get xstar
-                
-        x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name,fstar_scaled=fstar_scaled)
-
-        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*1e-5)):
-            
-            if self.verbose==1:
-                print("{} x_max is repeated".format(self.acq_name))
-                
-            # lift up the surrogate function
-            self.gp.IsZeroMean=True
-            self.IsZeroMean=True
-            self.gp=TransformedGP(self.scaleSearchSpace,verbose=self.verbose,IsZeroMean=self.IsZeroMean)
-            ur = unique_rows(self.X)
-            self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
-            
-            x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name,fstar_scaled=fstar_scaled)
-            
-        # record the optimization time
-        finished_opt=time.time()
-        elapse_opt=finished_opt-start_opt
-        self.time_opt=np.hstack((self.time_opt,elapse_opt))
-        
-                              
-        # store X                                     
-        self.X = np.vstack((self.X, x_max.reshape((1, -1))))
-
-        # compute X in original scale
-        x_max_ori=self.Xscaler.inverse_transform(np.reshape(x_max,(-1,self.dim)))
-
-        self.X_ori=np.vstack((self.X_ori, x_max_ori))
-        # evaluate Y using original X
-        
-        #self.Y = np.append(self.Y, self.f(temp_X_new_original))
-        Y_ori=self.f(x_max_ori)
-        self.Y_ori = np.append(self.Y_ori, Y_ori)
-        
-        # update Y after change Y_ori
-        self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
-        
-        return x_max

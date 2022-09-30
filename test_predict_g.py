@@ -78,14 +78,14 @@ temp['IsTGP']=0 # we can try 'tgp' by setting it =1
 temp={}
 temp['name']='ei' # vanilla EI
 temp['IsTGP']=0 # we can try 'tgp' by setting it =1
-acq_type_list.append(temp)
+#acq_type_list.append(temp)
 
 
 
 temp={}
 temp['name']='random' # random
 temp['IsTGP']=0 # we can try 'tgp' by setting it =1
-acq_type_list.append(temp)
+#acq_type_list.append(temp)
 
 fig=plt.figure()
 
@@ -137,10 +137,8 @@ for idx, (myfunction,acq_type,) in enumerate(itertools.product(myfunction_list,a
     
     utilities.print_result_sequential(bo,myfunction,Score,acq_type) 
     
-    
     ## plot the result
     # process the result
-    
     y_best_sofar=[0]*len(bo)
     for uu,mybo in enumerate(bo):
         y_best_sofar[uu]=[ (myfunction.fstar - np.max(mybo.Y_ori[:ii+1]) ) for ii in range(len(mybo.Y_ori))]
