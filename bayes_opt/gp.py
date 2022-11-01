@@ -100,8 +100,7 @@ class GaussianProcess(object):
 
         logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
-        #print(hyper_values,logmarginal)
-        return np.asscalar(logmarginal)
+        return np.float(logmarginal)
     
     def set_ls(self,lengthscale):
         self.hyper['lengthscale']=lengthscale
