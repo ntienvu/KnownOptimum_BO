@@ -3,16 +3,14 @@
 
 import numpy as np
 from scipy.optimize import minimize
-#from bayes_opt.acquisition_functions import unique_rows
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import euclidean_distances
-#import scipy.linalg as spla
 from bayes_opt.utilities import unique_rows
 import scipy
 
 class TransformedGP(object):
     # transform GP given known optimum value: f = f^* - 1/2 g^2
-    def __init__ (self,SearchSpace,fstar=None,noise_delta=1e-8,verbose=0,IsZeroMean=False):
+    def __init__ (self,SearchSpace,fstar=None,noise_delta=1e-6,verbose=0,IsZeroMean=False):
         # init the model
     
         self.noise_delta=noise_delta
@@ -27,7 +25,7 @@ class TransformedGP(object):
         
         self.hyper={}
         self.hyper['var']=1 # standardise the data
-        self.hyper['lengthscale']=0.035 #to be optimised
+        self.hyper['lengthscale']=0.1 #to be optimised
         #self.hyper['noise_delta']=noise_delta # could be optimised
         self.noise_delta=self.noise_delta
         self.fstar=fstar
@@ -64,7 +62,7 @@ class TransformedGP(object):
         self.X=X
         self.Y=Y
         if fstar is not None:
-            self.fstar=fstar
+            self.fstar = fstar
         self.G=np.sqrt(2.0*(fstar-Y))
         
         # print("only SE kernel is implemented!")        
@@ -72,24 +70,20 @@ class TransformedGP(object):
             self.hyper['lengthscale']=self.optimise()         # optimise GP hyperparameters
         #self.hyper['epsilon'],self.hyper['lengthscale'],self.noise_delta=self.optimise()         # optimise GP hyperparameters
         self.KK_x_x=self.mycov(self.X,self.X,self.hyper)+np.eye(len(X))*self.noise_delta 
-        #self.KK_x_x=np.exp(-np.square(Euc_dist)/self.lengthscale)+np.eye(len(X))*self.noise_delta
         
         if np.isnan(self.KK_x_x).any(): #NaN
             print("nan in KK_x_x")
-        
-   
-        self.L=np.linalg.cholesky(self.KK_x_x)
-        
-        # no zero mean
+           
+        self.L = np.linalg.cholesky(self.KK_x_x)
         
         # zero mean
         if self.IsZeroMean:
-            tempG=np.linalg.solve(self.L,self.G)
+            tempG = np.linalg.solve(self.L,self.G)
         else:
-            tempG=np.linalg.solve(self.L,self.G-np.sqrt(2*self.fstar))
+            tempG = np.linalg.solve(self.L,self.G-np.sqrt(2*self.fstar))
         
         #self.alpha=np.linalg.solve(self.L.T,temp)
-        self.alphaG=np.linalg.solve(self.L.T,tempG)
+        self.alphaG = np.linalg.solve(self.L.T,tempG)
         
     def log_llk(self,X,y,hyper_values):
         
@@ -119,7 +113,7 @@ class TransformedGP(object):
 
         logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
-        return np.asscalar(logmarginal)
+        return float(logmarginal)
    
         
     def set_ls(self,lengthscale):
@@ -136,7 +130,7 @@ class TransformedGP(object):
 
         # epsilon, ls, var, noise var
         #bounds=np.asarray([[9e-3,0.007],[1e-2,self.noise_upperbound]])
-        bounds=np.asarray([[1e-2,1]])
+        bounds=np.asarray([[3e-2,1]])
 
         init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
         logllk=[0]*init_theta.shape[0]
@@ -149,8 +143,11 @@ class TransformedGP(object):
                                    bounds=bounds,method="L-BFGS-B",options=opts)#L-BFGS-B
         
         if self.verbose:
-            print("estimated lengthscale",res.x)
-            
+            print("estimated lengthscale", np.round(res.x,4) )
+        
+        # update the new lengthscale
+        self.set_ls(res.x)
+        
         return res.x  
 
     def predict_g2(self,xTest,eval_MSE=True):

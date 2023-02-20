@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 class GaussianProcess(object):
-    def __init__ (self,SearchSpace,noise_delta=1e-8,verbose=0):
+    def __init__ (self,SearchSpace,noise_delta=1e-6,verbose=0):
         self.noise_delta=noise_delta
         self.noise_upperbound=noise_delta
         self.mycov=self.cov_RBF
@@ -28,7 +28,7 @@ class GaussianProcess(object):
         
         self.hyper={}
         self.hyper['var']=1 # standardise the data
-        self.hyper['lengthscale']=0.04 #to be optimised
+        self.hyper['lengthscale']=0.1 #to be optimised
         self.noise_delta=noise_delta
         return None
         
@@ -100,7 +100,7 @@ class GaussianProcess(object):
 
         logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
-        return np.float(logmarginal)
+        return float(logmarginal)
     
     def set_ls(self,lengthscale):
         self.hyper['lengthscale']=lengthscale
@@ -128,8 +128,11 @@ class GaussianProcess(object):
                                    bounds=bounds,method="L-BFGS-B",options=opts)#L-BFGS-B
         
         if self.verbose:
-            print("estimated lengthscale",res.x)
+            print("estimated lengthscale", np.round(res.x,4) )
             
+        # update the new lengthscale
+        self.set_ls(res.x)
+        
         return res.x  
    
     def predict(self,Xtest,isOriScale=False):

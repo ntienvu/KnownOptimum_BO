@@ -53,7 +53,6 @@ class BayesOpt_KnownOptimumValue(object):
             self.verbose=1
         else:
             self.verbose=0
-        # Find number of parameters
         
         if isinstance(SearchSpace,dict):
             # Get the name of the parameters
@@ -108,18 +107,11 @@ class BayesOpt_KnownOptimumValue(object):
             self.gp=GaussianProcess(self.scaleSearchSpace,verbose=verbose)
 
         # acquisition function
-        self.acq_func = None
-    
-        self.logmarginal=0
+        self.acq_func = None   
 
         # store all selection of AF for algorithm with confidence bound
         self.marker=[]
-        
-        self.flagTheta_TS=0
-        self.mean_theta_TS=None
-        # will be later used for visualization
-        
-        self.marker=[]
+       
         
     def set_ls(self,lengthscale):
         self.gp.set_ls(lengthscale)
@@ -155,7 +147,7 @@ class BayesOpt_KnownOptimumValue(object):
         return mu, np.sqrt(sigma2)
     
     # =============================================================================
-    #   Function init the BayesOpt class with the input X and output Y
+    #   Init the BayesOpt class with the input X and output Y
     # =============================================================================
     def init_with_data(self, init_X,init_Y):
         """      
@@ -177,7 +169,7 @@ class BayesOpt_KnownOptimumValue(object):
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
 
     # =============================================================================
-    #   Function init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
+    #   Init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
     # =============================================================================
     def init(self, n_init_points=3, seed=1):
         """      
@@ -193,19 +185,42 @@ class BayesOpt_KnownOptimumValue(object):
    
         self.X_ori = np.asarray(init_X)
         
-        # Evaluate target function at all initialization           
-        y_init=self.f(init_X)
+        # Evaluate target function at all initialization  points         
+        y_init=self.f(init_X) # y = f(x)
         y_init=np.reshape(y_init,(n_init_points,1))
 
         self.Y_ori = np.asarray(y_init)        
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
 
         self.X = self.Xscaler.transform(init_X)
+        
+    def perform_EI_on_GP(self,fstar_scaled):
+        """
+        perform vanilla EI using GP
 
+        Returns
+        -------
+        x_max = argmax EI(x)....
+
+        """
+        
+        self.gp=GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
+        ur = unique_rows(self.X)
+        self.gp.fit(self.X[ur], self.Y[ur])
+        self.gp.set_optimum_value(fstar_scaled)
+            
+        x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ei")
+        
+        return x_max
+
+    # =============================================================================
+    #   Select the next point
+    # =============================================================================
     def select_next_point(self):
         """
         select the next point to evaluate
         -------
+        Return:
         x: recommented point for evaluation
         """
 
@@ -229,33 +244,37 @@ class BayesOpt_KnownOptimumValue(object):
             
         # check if the surrogate hit the optimum value f*, check if UCB and LCB cover the fstar
         x_ucb,y_ucb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ucb",IsReturnY=True,fstar_scaled=fstar_scaled)
-        x_lcb,y_lcb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="lcb",IsReturnY=True,IsMax=False)
         
         if y_ucb<fstar_scaled: # f* > ucb we initially use EI with the vanilla GP until the fstar is covered by the upper bound
-            x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ei")
             self.marker.append(0)
+            x_max = self.perform_EI_on_GP(fstar_scaled)
+            
             if self.verbose==1:
-                print("y_lcb={} y_ucb={} fstar_scaled={:.4f}".format(y_lcb,y_ucb,fstar_scaled))
-                print("EI")
+                print("y_ucb={:.3f} fstar_scaled={:.3f}, perform EI".format(float(y_ucb),fstar_scaled))
+                
         else: # perform TransformGP and ERM/CBM
             self.marker.append(1)
             self.IsTGP=1
             x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name, \
                                     fstar_scaled=fstar_scaled)
 
-        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*1e-5)):
+        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*5e-4)): # repeated
+            # we can either perform random selection (1) or lift up the surrogate function and reselect it (2)
             
             if self.verbose==1:
                 print("{} x_max is repeated".format(self.acq_name))
                 
-            # lift up the surrogate function
-            self.gp.IsZeroMean=True
-            self.IsZeroMean=True
-            self.gp=TransformedGP(self.scaleSearchSpace,verbose=self.verbose,IsZeroMean=self.IsZeroMean)
-            ur = unique_rows(self.X)
-            self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
+            # (1) select random point
+            x_max = np.random.uniform(self.scaleSearchSpace[:, 0], self.scaleSearchSpace[:, 1],size=(1, self.dim))
+           
+            # (2) lift up the surrogate function
+            # self.gp.IsZeroMean=True
+            # self.IsZeroMean=True
+            # self.gp=TransformedGP(self.scaleSearchSpace,verbose=self.verbose,IsZeroMean=self.IsZeroMean)
+            # ur = unique_rows(self.X)
+            # self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
             
-            x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name,fstar_scaled=fstar_scaled)
+            # x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name,fstar_scaled=fstar_scaled)
             
    
         # store X                                     
@@ -274,5 +293,6 @@ class BayesOpt_KnownOptimumValue(object):
         # update Y after change Y_ori
         self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
         
+        # return the selected point x_max
         return x_max   
         

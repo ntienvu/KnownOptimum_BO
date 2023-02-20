@@ -37,6 +37,8 @@ class AcquisitionFunction(object):
         if np.any(np.isnan(x)):
             return 0
         
+        if self.acq_name == 'pure_exploration':
+            return self.pure_exploration( gp,x)
         if self.acq_name == 'ucb' or self.acq_name == 'gp_ucb' :
             return self._gp_ucb( gp,x)
         if self.acq_name=='cbm':
@@ -57,11 +59,20 @@ class AcquisitionFunction(object):
         var[var<1e-10]=0
 
         #beta_t = gp.X.shape[1] * np.log(len(gp.Y))
-        beta_t = 2 * np.log(len(gp.Y));
+        beta_t = 1 * np.log(len(gp.Y));
         
         output = mean - np.sqrt(beta_t) * np.sqrt(var) 
     
         return output.ravel()
+    
+    @staticmethod
+    def pure_exploration(gp,xTest,fstar_scale=0):
+       
+        mean, var = gp.predict(xTest)
+        var.flags['WRITEABLE']=True
+        var[var<1e-10] = 0             
+       
+        return  var.ravel()
     
     @staticmethod
     def _gp_ucb(gp,xTest,fstar_scale=0):
@@ -89,9 +100,10 @@ class AcquisitionFunction(object):
         
         # Linear in D, log in t https://github.com/kirthevasank/add-gp-bandits/blob/master/BOLibkky/getUCBUtility.m
         #beta_t = gp.X.shape[1] * np.log(len(gp.Y))
-        beta_t = np.log(len(gp.Y))
+        
+        beta_t = 0.1*np.log(len(gp.Y))
       
-        #beta=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
+        #beta_t=300*0.1*np.log(5*len(gp.Y))# delta=0.2, gamma_t=0.1
         output = -np.abs(mean-target) - np.sqrt(beta_t) * np.sqrt(var) 
         return output.ravel()
        

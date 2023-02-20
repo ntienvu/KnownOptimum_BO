@@ -105,7 +105,6 @@ class BayesOpt:
         
         self.time_opt=0
          
-
         # acquisition function
         self.acq_name = acq_name
         self.logmarginal=0
@@ -113,7 +112,7 @@ class BayesOpt:
         self.gp=GaussianProcess(self.scaleSearchSpace,verbose=verbose)
 
     # =============================================================================
-    #   Function init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
+    #   Init the BayesOpt class by randomly generate input X and init_Y=f(init_X)
     # =============================================================================
     def init(self, n_init_points=3,seed=1):
         """      
@@ -138,9 +137,9 @@ class BayesOpt:
         self.X = self.Xscaler.transform(init_X)
 
     # =============================================================================
-    #   Function init the BayesOpt class with the input X and output Y
+    #   Init the BayesOpt class with the input X and output Y
     # =============================================================================
-    def init_with_data(self, init_X,init_Y,isPermutation=False):
+    def init_with_data(self, init_X,init_Y):
         """      
         Input parameters
         ----------
@@ -165,6 +164,9 @@ class BayesOpt:
         mu, sigma2 = self.gp.predict(Xnew)
         return mu, np.sqrt(sigma2)
         
+    # =============================================================================
+    #   Select the next point
+    # =============================================================================
     def select_next_point(self):
         """
         Main optimization method.
