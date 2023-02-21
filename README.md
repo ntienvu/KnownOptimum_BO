@@ -35,6 +35,7 @@ demo_customize_your_own_function.ipynb
 ```
 run_all_benchmark_functions.py
 ```
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/122PjWzunDQEOqXtQWjJ1Ut-XLXeIuxc1?usp=sharing)
 
 After running these scripts to reproduce experiments, the results will be stored as pickles files in "pickle_storage" folder.
 Then, we can plot all the results using scripts in the "plot" folder.
