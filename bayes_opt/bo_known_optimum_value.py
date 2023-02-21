@@ -259,12 +259,12 @@ class BayesOpt_KnownOptimumValue(object):
                                     fstar_scaled=fstar_scaled)
 
         if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*5e-4)): # repeated
-            # we can either perform random selection (1) or lift up the surrogate function and reselect it (2)
+            # we randomly select a point if it is repeated
             
             if self.verbose==1:
-                print("{} x_max is repeated".format(self.acq_name))
+                print("{} x_max is repeated, perform Random Selection".format(self.acq_name))
                 
-            # (1) select random point
+            # select random point
             x_max = np.random.uniform(self.scaleSearchSpace[:, 0], self.scaleSearchSpace[:, 1],size=(1, self.dim))
            
             # (2) lift up the surrogate function
@@ -273,10 +273,8 @@ class BayesOpt_KnownOptimumValue(object):
             # self.gp=TransformedGP(self.scaleSearchSpace,verbose=self.verbose,IsZeroMean=self.IsZeroMean)
             # ur = unique_rows(self.X)
             # self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
-            
             # x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name,fstar_scaled=fstar_scaled)
             
-   
         # store X                                     
         self.X = np.vstack((self.X, x_max.reshape((1, -1))))
 
