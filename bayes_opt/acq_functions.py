@@ -7,6 +7,7 @@ Created on Fri Jul 10 16:05:06 2020
 
 import numpy as np
 from scipy.stats import norm
+#from scipy.stats import invnorm
 
 class AcquisitionFunction(object):
     """
@@ -16,12 +17,12 @@ class AcquisitionFunction(object):
     def __init__(self, acq_name):
                 
         ListAcq=['bucb','ucb', 'ei', 'poi','random','thompson', 'lcb', 'mu',                     
-                     'pure_exploration','kov_mes','mes','kov_ei','gp_ucb',
+                     'pure_exploration','mes_fstar','mes','kov_ei','gp_ucb',
                          'erm','cbm','kov_tgp','kov_tgp_ei']
         # kov = know optimum value
         # check valid acquisition function
         IsTrue=[val for idx,val in enumerate(ListAcq) if val in acq_name]
-        #if  not in acq_name:
+        
         if  IsTrue == []:
             err = "The utility function " \
                   "{} has not been implemented, " \
@@ -32,7 +33,7 @@ class AcquisitionFunction(object):
                     
     def acq_kind(self,gp,x):
             
-        y_max=np.max(gp.Y)
+        y_max = np.max(gp.Y)
         
         if np.any(np.isnan(x)):
             return 0
@@ -41,7 +42,7 @@ class AcquisitionFunction(object):
             return self.pure_exploration( gp,x)
         if self.acq_name == 'ucb' or self.acq_name == 'gp_ucb' :
             return self._gp_ucb( gp,x)
-        if self.acq_name=='cbm':
+        if self.acq_name == 'cbm':
             return self. _cbm(x,gp,target=gp.fstar)
         if self.acq_name == 'lcb':
             return self._lcb(gp,x)
@@ -51,6 +52,9 @@ class AcquisitionFunction(object):
             return self._ei(x, gp, y_max=gp.fstar)
         if self.acq_name == 'erm'  or self.acq_name=='kov_ei_cb':
             return self._erm(x, gp, fstar=gp.fstar)
+        if self.acq_name == 'mes_fstar':
+            return self._mes_fstar(x, gp, fstar = gp.fstar)
+
     
     @staticmethod
     def _lcb(gp,xTest,fstar_scale=0):
@@ -110,18 +114,17 @@ class AcquisitionFunction(object):
     @staticmethod
     def _erm(x, gp, fstar):
                 
-        #y_max=np.asscalar(y_max)
         mean, var = gp.predict(x)
     
         var2 = np.maximum(var, 1e-9 + 0 * var)
         z = ( fstar-mean)/np.sqrt(var2)        
         out=(fstar-mean) * (norm.cdf(z)) + np.sqrt(var2) * norm.pdf(z)
 
-        return -1*out.ravel() # for minimization problem
+        return -1*out.ravel() # (*-1) for minimization problem
                     
     @staticmethod
     def _ei(x, gp, y_max):
-        #y_max=np.asscalar(y_max)
+        
         mean, var = gp.predict(x)
         var2 = np.maximum(var, 1e-10 + 0 * var)
         z = (mean - y_max)/np.sqrt(var2)        
@@ -130,3 +133,19 @@ class AcquisitionFunction(object):
         out[var2<1e-10]=0
         
         return out.ravel()
+    
+    @staticmethod
+    def _mes_fstar(x, gp, fstar):
+        """
+        Max Value Entropy Search with known optimum value fstar
+        The implementation is based on Eq. (6) of Z. Wang and S. Jegelka 2017
+        https://arxiv.org/pdf/1703.01968.pdf
+        """
+
+        mean_x, var_x = gp.predict(x)
+
+        gamma_ystar = (fstar-mean_x)*1.0/var_x
+        
+        acq_value = 0.5*gamma_ystar*norm.pdf(gamma_ystar)*1.0/norm.cdf(gamma_ystar)\
+            -np.log(norm.cdf(gamma_ystar))
+        return acq_value

@@ -10,7 +10,7 @@ import scipy
 
 class TransformedGP(object):
     # transform GP given known optimum value: f = f^* - 1/2 g^2
-    def __init__ (self,SearchSpace,fstar=None,noise_delta=1e-6,verbose=0,IsZeroMean=False):
+    def __init__ (self,SearchSpace,fstar=None,noise_delta=1e-5,verbose=0,IsZeroMean=False):
         # init the model
     
         self.noise_delta=noise_delta
@@ -86,32 +86,45 @@ class TransformedGP(object):
         self.alphaG = np.linalg.solve(self.L.T,tempG)
         
     def log_llk(self,X,y,hyper_values):
-        
+        """
+        Calculate the GP log marginal likelihood
+
+        Parameters
+        ----------
+        X : [Nxd] input observations
+        y : [Nx1] output observations y=f(X) + eps
+        hyper_values : GP hyperparameters including kernel hypers, noise hyper...
+
+        Returns
+        -------
+        scalar value of log likelihood
+
+        """
         #print(hyper_values)
         hyper={}
-        hyper['var']=1
-        hyper['lengthscale']=hyper_values[0]
-        noise_delta=self.noise_delta
+        hyper['var'] = 1
+        hyper['lengthscale'] = hyper_values[0]
+        noise_delta = self.noise_delta
 
-        KK_x_x=self.mycov(X,X,hyper)+np.eye(len(X))*noise_delta     
+        KK_x_x = self.mycov(X,X,hyper)+np.eye(len(X))*noise_delta     
         if np.isnan(KK_x_x).any(): #NaN
             print("nan in KK_x_x !")   
 
         try:
-            L=scipy.linalg.cholesky(KK_x_x,lower=True)
-            alpha=np.linalg.solve(KK_x_x,y)
+            L = scipy.linalg.cholesky(KK_x_x,lower=True)
+            alpha = np.linalg.solve(KK_x_x,y)
 
         except: # singular
             return -np.inf
         try:
-            first_term=-0.5*np.dot(self.Y.T,alpha)
-            W_logdet=np.sum(np.log(np.diag(L)))
-            second_term=-W_logdet
+            first_term = -0.5*np.dot(self.Y.T,alpha)
+            W_logdet = np.sum(np.log(np.diag(L)))
+            second_term = -W_logdet
 
         except: # singular
             return -np.inf
 
-        logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
+        logmarginal = first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
         return float(logmarginal)
    
@@ -130,7 +143,7 @@ class TransformedGP(object):
 
         # epsilon, ls, var, noise var
         #bounds=np.asarray([[9e-3,0.007],[1e-2,self.noise_upperbound]])
-        bounds=np.asarray([[3e-2,1]])
+        bounds=np.asarray([[1e-2,1]])
 
         init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
         logllk=[0]*init_theta.shape[0]

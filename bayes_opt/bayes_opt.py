@@ -193,7 +193,16 @@ class BayesOpt:
         x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name)
 
         x_max_ori=self.Xscaler.inverse_transform(np.reshape(x_max,(-1,self.dim)))
-
+    
+        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*3e-4)): # repeated
+            # we randomly select a point if it is repeated
+            if self.verbose==1:
+                print("{} x_max is repeated, perform Random Selection".format(self.acq_name))
+                
+            # select random point
+            x_max = np.random.uniform(self.scaleSearchSpace[:, 0], self.scaleSearchSpace[:, 1],size=(1, self.dim))
+         
+    
         if self.f is None:
             return x_max,x_max_ori
         

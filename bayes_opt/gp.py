@@ -9,13 +9,10 @@ from sklearn.metrics.pairwise import euclidean_distances
 from scipy.optimize import minimize
 from sklearn.preprocessing import MinMaxScaler
 import scipy
-#from sklearn.metrics import pairwise_distances
-import matplotlib.pyplot as plt
-#import matplotlib as mpl
-import matplotlib.cm as cm
+
 
 class GaussianProcess(object):
-    def __init__ (self,SearchSpace,noise_delta=1e-6,verbose=0):
+    def __init__ (self,SearchSpace,noise_delta=1e-5,verbose=0):
         self.noise_delta=noise_delta
         self.noise_upperbound=noise_delta
         self.mycov=self.cov_RBF
@@ -28,7 +25,7 @@ class GaussianProcess(object):
         
         self.hyper={}
         self.hyper['var']=1 # standardise the data
-        self.hyper['lengthscale']=0.1 #to be optimised
+        self.hyper['lengthscale']=0.11 #to be optimised
         self.noise_delta=noise_delta
         return None
         
@@ -73,6 +70,20 @@ class GaussianProcess(object):
     
 
     def log_llk(self,X,y,hyper_values):
+        """
+        Calculate the GP log marginal likelihood
+
+        Parameters
+        ----------
+        X : [Nxd] input observations
+        y : [Nx1] output observations y=f(X) + eps
+        hyper_values : GP hyperparameters including kernel hypers, noise hyper...
+
+        Returns
+        -------
+        scalar value of log likelihood
+
+        """
         
         #print(hyper_values)
         hyper={}
@@ -80,13 +91,13 @@ class GaussianProcess(object):
         hyper['lengthscale']=hyper_values[0]
         noise_delta=self.noise_delta
 
-        KK_x_x=self.mycov(X,X,hyper)+np.eye(len(X))*noise_delta     
+        KK_x_x = self.mycov(X,X,hyper)+np.eye(len(X))*noise_delta     
         if np.isnan(KK_x_x).any(): #NaN
             print("nan in KK_x_x !")   
 
         try:
-            L=scipy.linalg.cholesky(KK_x_x,lower=True)
-            alpha=np.linalg.solve(KK_x_x,y)
+            L = scipy.linalg.cholesky(KK_x_x,lower=True)
+            alpha = np.linalg.solve(KK_x_x,y)
 
         except: # singular
             return -np.inf
@@ -98,7 +109,7 @@ class GaussianProcess(object):
         except: # singular
             return -np.inf
 
-        logmarginal=first_term+second_term-0.5*len(y)*np.log(2*3.14)
+        logmarginal = first_term+second_term-0.5*len(y)*np.log(2*3.14)
         
         return float(logmarginal)
     
@@ -109,21 +120,21 @@ class GaussianProcess(object):
         """
         Optimise the GP kernel hyperparameters
         Returns
-        x_t
+        argmax of the hyperparameter
         """
         opts ={'maxiter':200,'maxfun':200,'disp': False}
 
         # epsilon, ls, var, noise var
         #bounds=np.asarray([[9e-3,0.007],[1e-2,self.noise_upperbound]])
-        bounds=np.asarray([[1e-3,1]])
+        bounds = np.asarray([[1e-3,1]])
 
         init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
-        logllk=[0]*init_theta.shape[0]
+        logllk = [0]*init_theta.shape[0]
         for ii,val in enumerate(init_theta):           
-            logllk[ii]=self.log_llk(self.X,self.Y,hyper_values=val) #noise_delta=self.noise_delta
+            logllk[ii] = self.log_llk(self.X,self.Y,hyper_values=val) #noise_delta=self.noise_delta
             
-        x0=init_theta[np.argmax(logllk)]
-
+        x0 = init_theta[np.argmax(logllk)]
+ 
         res = minimize(lambda x: -self.log_llk(self.X,self.Y,hyper_values=x),x0,
                                    bounds=bounds,method="L-BFGS-B",options=opts)#L-BFGS-B
         
@@ -146,24 +157,24 @@ class GaussianProcess(object):
         """    
         
         if isOriScale:
-            Xtest=self.Xscaler.transform(Xtest)
+            Xtest = self.Xscaler.transform(Xtest)
             
         if len(Xtest.shape)==1: # 1d
             Xtest=np.reshape(Xtest,(-1,self.X.shape[1]))
             
         if Xtest.shape[1] != self.X.shape[1]: # different dimension
-            Xtest=np.reshape(Xtest,(-1,self.X.shape[1]))
+            Xtest = np.reshape(Xtest,(-1,self.X.shape[1]))
        
-        KK_xTest_xTest=self.mycov(Xtest,Xtest,self.hyper)+np.eye(Xtest.shape[0])*self.noise_delta
-        KK_xTest_x=self.mycov(Xtest,self.X,self.hyper)
+        KK_xTest_xTest = self.mycov(Xtest,Xtest,self.hyper)+np.eye(Xtest.shape[0])*self.noise_delta
+        KK_xTest_x = self.mycov(Xtest,self.X,self.hyper)
 
-        mean=np.dot(KK_xTest_x,self.alpha)
-        v=np.linalg.solve(self.L,KK_xTest_x.T)
-        var=KK_xTest_xTest-np.dot(v.T,v)
+        mean = np.dot(KK_xTest_x,self.alpha)
+        v = np.linalg.solve(self.L,KK_xTest_x.T)
+        var = KK_xTest_xTest-np.dot(v.T,v)
 
-        #mean_ori=mean*np.std(self.Y_ori)+np.mean(self.Y_ori)
-        std=np.reshape(np.diag(var),(-1,1))
+        std = np.reshape(np.diag(var),(-1,1))
         
+        #mean_ori=mean*np.std(self.Y_ori)+np.mean(self.Y_ori)
         #std_ori=std*np.std(self.Y_ori)#+np.mean(self.Y_ori)
         
         #return mean,std,mean_ori,std_ori

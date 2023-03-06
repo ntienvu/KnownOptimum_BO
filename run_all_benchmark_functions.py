@@ -42,17 +42,18 @@ acq_type_list=[]
 temp={}
 temp['name']='erm' # expected regret minimization
 temp['IsTGP']=1 # recommended to use tgp for ERM
-acq_type_list.append(temp)
+#acq_type_list.append(temp)
 
 temp={}
 temp['name']='cbm' # confidence bound minimization
 temp['IsTGP']=1 # recommended to use tgp for CBM
-acq_type_list.append(temp)
-
-#temp={}
-#temp['name']='kov_mes' # MES+f*
-#temp['IsTGP']=0 # we can try 'tgp'
 #acq_type_list.append(temp)
+
+
+temp={}
+temp['name']='mes_fstar' # MES+f*
+temp['IsTGP']=0 # we can try 'tgp'
+acq_type_list.append(temp)
 
 # temp={}
 # temp['name']='kov_ei' # this is EI + f*
@@ -62,12 +63,12 @@ acq_type_list.append(temp)
 temp={}
 temp['name']='ucb' # vanilla UCB
 temp['IsTGP']=0 # we can try 'tgp' by setting it =1
-acq_type_list.append(temp)
+#acq_type_list.append(temp)
 
 temp={}
 temp['name']='ei' # vanilla EI
 temp['IsTGP']=0 # we can try 'tgp' by setting it =1
-acq_type_list.append(temp)
+#acq_type_list.append(temp)
 
 temp={}
 temp['name']='random' # random
@@ -98,7 +99,7 @@ for idx, (myfunction,acq_type,) in enumerate(itertools.product(function_list,acq
        
     for ii in range(nRepeat):
         
-        if 'kov' in acq_name or acq_name == 'erm' or acq_name == 'cbm':
+        if 'fstar' in acq_name or acq_name == 'erm' or acq_name == 'cbm':
             bo[ii]=BayesOpt_KnownOptimumValue(myfunction.func,myfunction.bounds,myfunction.fstar, \
                                   acq_name,IsTGP,verbose=1)
         else:
@@ -115,11 +116,11 @@ for idx, (myfunction,acq_type,) in enumerate(itertools.product(function_list,acq
         print("ii={} Best Found Value={:.3f}".format(ii,myfunction.ismax*np.max(ybest[ii])))                                              
         
     # record the result and save to pickle files================================
-    # Score={}
-    # Score["ybest"]=ybest
-    # Score["MyTime"]=MyTime
-    # Score["OptTime"]=OptTime
-    # utilities.print_result_sequential(bo,myfunction,Score,acq_type) 
+    Score={}
+    Score["ybest"]=ybest
+    Score["MyTime"]=MyTime
+    Score["OptTime"]=OptTime
+    utilities.print_result_sequential(bo,myfunction,Score,acq_type) 
     
     ## plot the result    
     y_best_sofar=[0]*len(bo)

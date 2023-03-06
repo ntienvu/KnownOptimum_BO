@@ -198,18 +198,14 @@ def print_result_sequential(bo,func,Score,acq_type):
     if 'xstars' in acq_type:
         acq_type['xstars']=[]
         
-    #Regret=Score["Regret"]
     ybest=Score["ybest"]
-    #GAP=Score["GAP"]
     MyTime=Score["MyTime"]
     
     print('{:s} {:d}'.format(func.name,func.input_dim))
     print(acq_type['name'],acq_type['IsTGP'])
-    
  
     MaxFx=[val.max() for idx,val in enumerate(ybest)]
 
-    
   
     if func.ismax==1:
         print('MaxBest={:.4f}({:.2f})'.format(func.ismax*np.mean(MaxFx),np.std(MaxFx)))    
@@ -217,9 +213,9 @@ def print_result_sequential(bo,func,Score,acq_type):
         print('MinBest={:.4f}({:.2f})'.format(func.ismax*np.mean(MaxFx),np.std(MaxFx)))
             
     
-    if 'MyOptTime' in Score:
-        MyOptTime=Score["MyOptTime"]
-        print('OptTime/Iter={:.1f}({:.1f})'.format(np.mean(MyOptTime),np.std(MyOptTime)))
+    if 'OptTime' in Score:
+        OptTime=Score["OptTime"]
+        print('OptTime/Iter={:.1f}({:.1f})'.format(np.mean(OptTime),np.std(OptTime)))
         
     if acq_type['IsTGP']==1: # using Transformed GP
         strFile="{:s}_{:d}_{:s}_TGP.pickle".format(func.name,func.input_dim,acq_type['name'])
@@ -235,6 +231,6 @@ def print_result_sequential(bo,func,Score,acq_type):
     
     if version==2:
         with open(path, 'wb') as f:
-            pickle.dump([ybest, MyTime,bo[-1].bounds,MyOptTime], f)
+            pickle.dump([ybest, MyTime,bo[-1].bounds,OptTime], f)
     else:
-        pickle.dump( [ybest, MyTime,bo,MyOptTime], open( path, "wb" ) )
+        pickle.dump( [ybest, MyTime,bo,OptTime], open( path, "wb" ) )

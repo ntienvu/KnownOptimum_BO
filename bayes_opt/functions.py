@@ -648,7 +648,8 @@ class alpine1(functions):
         self.input_dim = input_dim
             
         self.ismax=-1
-        self.fstar = -46*self.ismax
+        #self.fstar = -46*self.ismax
+        self.fstar = 0*self.ismax
 
         self.name='alpine1'
 
@@ -656,7 +657,7 @@ class alpine1(functions):
     def func(self,X):
         X = reshape(X,self.input_dim)
         #n = X.shape[0]
-        temp=(X*np.sin(X) + 0.1*X)
+        temp=np.abs(X*np.sin(X) + 0.1*X)
         if len(temp.shape)<=1:
             fval=np.sum(temp)
         else:

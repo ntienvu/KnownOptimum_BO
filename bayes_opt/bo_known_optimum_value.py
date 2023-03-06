@@ -7,7 +7,6 @@ Created on Tue Mar 29 11:49:58 2018
 import numpy as np
 from bayes_opt.transform_gp import TransformedGP
 from bayes_opt.gp import GaussianProcess
-import time
 from sklearn.preprocessing import MinMaxScaler
 from bayes_opt.utilities import unique_rows
 from bayes_opt.utilities import acq_max_with_name
@@ -117,15 +116,13 @@ class BayesOpt_KnownOptimumValue(object):
         self.gp.set_ls(lengthscale)
         
     def posterior(self, Xnew):
-        #self.gp.fit(self.X, self.Y,IsOptimize=1)
         self.gp.fit(self.X, self.Y)
         mu, sigma2 = self.gp.predict(Xnew)
         return mu, np.sqrt(sigma2)
     
     def posterior_tgp(self, Xnew):
-        fstar_scaled=(self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
+        fstar_scaled = (self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
 
-        #self.gp.fit(self.X, self.Y,fstar_scaled,IsOptimize=1)
         self.gp.fit(self.X, self.Y,fstar_scaled)
 
         x_ucb,y_ucb=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ucb",IsReturnY=True)
@@ -140,8 +137,6 @@ class BayesOpt_KnownOptimumValue(object):
         else:
             self.gp.IsZeroMean=False
             self.IsZeroMean=False
-
-        #self.gp.optimise()
             
         mu, sigma2 = self.gp.predict(Xnew)
         return mu, np.sqrt(sigma2)
@@ -186,11 +181,11 @@ class BayesOpt_KnownOptimumValue(object):
         self.X_ori = np.asarray(init_X)
         
         # Evaluate target function at all initialization  points         
-        y_init=self.f(init_X) # y = f(x)
-        y_init=np.reshape(y_init,(n_init_points,1))
+        y_init = self.f(init_X) # y = f(x)
+        y_init = np.reshape(y_init,(n_init_points,1))
 
         self.Y_ori = np.asarray(y_init)        
-        self.Y=(self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
+        self.Y = (self.Y_ori-np.mean(self.Y_ori))/np.std(self.Y_ori)
 
         self.X = self.Xscaler.transform(init_X)
         
@@ -204,12 +199,12 @@ class BayesOpt_KnownOptimumValue(object):
 
         """
         
-        self.gp=GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
+        self.gp = GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
         ur = unique_rows(self.X)
         self.gp.fit(self.X[ur], self.Y[ur])
         self.gp.set_optimum_value(fstar_scaled)
             
-        x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ei")
+        x_max = acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name="ei")
         
         return x_max
 
@@ -224,7 +219,7 @@ class BayesOpt_KnownOptimumValue(object):
         x: recommented point for evaluation
         """
 
-        fstar_scaled=(self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
+        fstar_scaled = (self.fstar-np.mean(self.Y_ori))/np.std(self.Y_ori)
             
         # init a new Gaussian Process
         if self.IsTGP==1:
@@ -233,7 +228,7 @@ class BayesOpt_KnownOptimumValue(object):
             ur = unique_rows(self.X)
             self.gp.fit(self.X[ur], self.Y[ur],fstar_scaled)
         else:
-            self.gp=GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
+            self.gp = GaussianProcess(self.scaleSearchSpace,verbose=self.verbose)
             ur = unique_rows(self.X)
             self.gp.fit(self.X[ur], self.Y[ur])
             self.gp.set_optimum_value(fstar_scaled)
@@ -258,7 +253,7 @@ class BayesOpt_KnownOptimumValue(object):
             x_max=acq_max_with_name(gp=self.gp,SearchSpace=self.scaleSearchSpace,acq_name=self.acq_name, \
                                     fstar_scaled=fstar_scaled)
 
-        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*5e-4)): # repeated
+        if np.any(np.abs((self.X - x_max)).sum(axis=1) <= (self.dim*3e-4)): # repeated
             # we randomly select a point if it is repeated
             
             if self.verbose==1:
