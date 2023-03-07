@@ -143,7 +143,7 @@ class TransformedGP(object):
 
         # epsilon, ls, var, noise var
         #bounds=np.asarray([[9e-3,0.007],[1e-2,self.noise_upperbound]])
-        bounds=np.asarray([[1e-2,1]])
+        bounds=np.asarray([[9e-3,1]])
 
         init_theta = np.random.uniform(bounds[:, 0], bounds[:, 1],size=(10, 1))
         logllk=[0]*init_theta.shape[0]
